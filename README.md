@@ -24,17 +24,13 @@ docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-py2-new
 
 ## Built With
 
-* [Montblanc](https://github.com/ska-sa/montblanc/) - Interferomtry simulation using RIME
+* [Montblanc](https://github.com/ska-sa/montblanc/) - Interferometry simulation using RIME
 * [PyEphem](https://rhodesmill.org/pyephem/) - Astronomical position calculations
 * [uvgen](https://github.com/SpheMakh/uvgen) - U,V coordinate simulation
 
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
 ## Authors
 
-* **Chris Finlay** - *Initial work* - [Github](https://github.com/chrisfinlay)
+* **Chris Finlay** - [LinkedIn](https://www.linkedin.com/in/chris-finlay/)
 
 ## License
 
@@ -45,5 +41,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 * Simon Perkins (For all the help with understanding Montblanc, his baby)
 * Michelle Lochner 
 * Bruce Bassett
+* Nadeem Oozeer
 
 
