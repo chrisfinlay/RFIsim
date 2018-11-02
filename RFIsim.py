@@ -38,13 +38,13 @@ class CustomSourceProvider(SourceProvider):
                 ("na", na),                # Antenna
                 ("nbl", na*(na-1)/2), # Baselines
                 ("npsrc", len(lm_coords))]      # Number of point sources
-    
+
     def point_lm(self, context):
         """ Supply point source lm coordinates to montblanc """
 
         # Shape (npsrc, 2)
         (ls, us), _ = context.array_extents(context.name)
-        
+
         return np.asarray(lm_coords[ls:us], dtype=context.dtype)
 
     def point_stokes(self, context):
@@ -52,22 +52,22 @@ class CustomSourceProvider(SourceProvider):
         # (npsrc, ntime, nchan, 4)
 
         return spectra
-    
+
     def direction_independent_effects(self, context):
         # (ntime, na, nchan, npol)
         (lt, ut), (la, ua), (lc, uc), (lpol, upol) = context.dim_extents('ntime', 'na', 'nchan', 'npol')
 
         return bandpass
-    
+
 #     def observed_vis
-    
+
 #     def model_vis(self, context):
 #         if self.noise != 0:
 #             n = np.random.randn(*context.shape) * self.noise + np.random.randn(*context.shape) * self.noise * 1j
 #         else:
 #             n = np.zeros(shape=context.shape, dtype=context.dtype)
 #         return n
-        
+
     def uvw(self, context):
         """ Supply UVW antenna coordinates to montblanc """
 
@@ -111,7 +111,7 @@ class CustomSinkProvider(SinkProvider):
 # Configure montblanc solver with a memory budget of 6GB
 # and set it to double precision floating point accuracy
 
-slvr_cfg = montblanc.rime_solver_cfg(mem_budget=6*1024*1024*1024, 
+slvr_cfg = montblanc.rime_solver_cfg(mem_budget=6*1024*1024*1024,
                                      dtype='double')
 
 ########## Run Simulation ######################################################################################################################
@@ -186,10 +186,6 @@ with h5py.File(save_file, 'a') as fp:
     fp['/input/A2'] = A2
     fp['/input/bandpass'] = bandpass
 
-# Create visibilities array
-
-vis = np.zeros(shape=(len(lm), na*(na-1)/2, nchan, 4), dtype=np.complex128)
-
 # Stokes parameters (I, Q, U, V)
 lm_stokes = [(1.0, 0.0, 0.0, 0.0),
              (1.0, 1.0, 0.0, 0.0),
@@ -215,29 +211,47 @@ with h5py.File(save_file, 'a') as fp:
     fp['/input/auto_pol_gains'] = antenna_gains_auto
     fp['/input/cross_pol_gains'] = antenna_gains_cross
 
+# Run simulation twice - once with RFI and once without
+
+for j in range(2):
+
+    vis = np.zeros(shape=(len(lm), na*(na-1)/2, nchan, 4), dtype=np.complex128)
+
+    if j==1:
+        spectra = (spectra[0])[None, :, :, :]
+        lm_stokes = [lm_stokes[0]]
 
 
-for i in range(len(lm)):
-    # LM coordinates
-    lm_coords = [astro_lm,
-                 (lm[i,0,0], lm[i,0,1]),
-                 (lm[i,1,0], lm[i,1,1]),
-                ]
-    # Create montblanc solver
-    with montblanc.rime_solver(slvr_cfg) as slvr:
+    for i in range(len(lm)):
+        # LM coordinates
+        if j==0:
+            lm_coords = [astro_lm,
+                         (lm[i,0,0], lm[i,0,1]),
+                         (lm[i,1,0], lm[i,1,1]),
+                        ]
+        else:
+            lm_coords = [astro_lm]
+            
+        # Create montblanc solver
+        with montblanc.rime_solver(slvr_cfg) as slvr:
 
-#         ms_mgr = MeasurementSetManager('MeerKAT_data/AP_Lib_0.ms', slvr_cfg)
+    #         ms_mgr = MeasurementSetManager('MeerKAT_data/AP_Lib_0.ms', slvr_cfg)
 
-        # Create Customer Source and Sink Providers
-        source_provs = [CustomSourceProvider(),
-                        FitsBeamSourceProvider(FITSfiles)
-                       ]
-        sink_provs = [CustomSinkProvider()]
+            # Create Customer Source and Sink Providers
+            source_provs = [CustomSourceProvider(),
+                            FitsBeamSourceProvider(FITSfiles)
+                           ]
+            sink_provs = [CustomSinkProvider()]
 
-        # Call solver, supplying source and sink providers
-        slvr.solve(source_providers=source_provs,
-                sink_providers=sink_provs)
+            # Call solver, supplying source and sink providers
+            slvr.solve(source_providers=source_provs,
+                    sink_providers=sink_provs)
 
-# Save output
-with h5py.File(save_file, 'a') as fp:
-    fp['/output/vis_dirty'] = vis
+    # Save output
+    if j==0:
+        with h5py.File(save_file, 'a') as fp:
+            fp['/output/vis_dirty'] = vis
+
+    else:
+        with h5py.File(save_file, 'a') as fp:
+            fp['/output/vis_clean'] = vis
