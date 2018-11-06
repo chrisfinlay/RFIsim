@@ -2,7 +2,7 @@
 
 This package is an RFI simulation tool for the MeerKAT radio telescope. It calculates real world satellite movement using two-line element sets (TLEs) and simulates a frequency spectrum and time dependence.
 
-The output are raw visibilities in the form of a numpy array that is saved as a binary .npy file.
+The output are raw visibilities that are saved into a HDF5 file along with all the input data used for the simulation.
 
 ## Getting Started
 
@@ -23,6 +23,7 @@ docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-py2-new
 cd /data
 git clone https://github.com/chrisfinlay/RFIsim.git
 cd RFIsim
+python utils/beam_sim/create_beam.py
 python RFIsim.py
 ```
 
@@ -35,6 +36,7 @@ python RFIsim.py
 ## Authors
 
 * **Chris Finlay** - [LinkedIn](https://www.linkedin.com/in/chris-finlay/)
+* **Nadeem Oozeer** - [LinkedIn](https://www.linkedin.com/in/oozeer-nadeem-100776b2/)
 
 ## License
 
@@ -45,4 +47,3 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 * Simon Perkins (For all the help with understanding Montblanc, his baby)
 * Michelle Lochner
 * Bruce Bassett
-* Nadeem Oozeer

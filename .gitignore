@@ -4,6 +4,6 @@ montblanc.log
 notebooks/
 utils/sat_sim/sat_spectra/sat_spectra.npy
 utils/sat_sim/sat_spectra/spectra_images
-utils/beam_sim/beams/
+utils/beam_sim/beams/*.fits
 *.ipynb_checkpoints
 *.pyc
