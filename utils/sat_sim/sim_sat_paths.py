@@ -100,28 +100,6 @@ def get_visible_sats(lm_alt):
 
     return lm_alt_vis[:,:,:2]
 
-def visible_sats(sats, obs, phase_centre, beam_radius=30):
-    """    
-    sats :         List of lists. Each internal list has the 3 lines of a TLEs as its elements.
-    obs  :         PyEphem observer object that has been initialised with a location and date.
-    phase_centre : The RA and DEC of the phase centre (central pointing direction) in degrees.
-    beam_radius  : Radius the beam is defined out to in degrees.
-    
-    Returns:
-        idx_vis  : List of indices of sats list for which the satellite is visible.
-    """
-    
-    idx_vis = []
-    for i, sat in enumerate(sats):
-        sat = ephem.readtle(*sat)
-        sat.compute(obs)
-        l, m = radec_to_lm(sat.ra, sat.dec, phase_centre)
-        theta = np.sqrt(l**2 + m**2)
-        if sat.alt>0 and theta<np.deg2rad(beam_radius):
-            idx_vis.append(i)
-
-    return np.array(idx_vis)
-
 # Get l,m tracks for satellites (track time steps and integration time needed as well as visible satellite index)
 def get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs=8):
 
