@@ -143,9 +143,20 @@ for i in range(nant):
         A2[k] = j
         k += 1
 
+# Get lm tracks of satellites
+
+lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs)
+n_sats = lm.shape[1]
+
+astro_lm = (0.0, 0.0)
+
 # Create frequency spectrum array
 
 spectra = np.load('utils/sat_sim/sat_spectra/Satellite_Frequency_Spectra.npy')
+np.random.seed(123)
+perm = np.random.permutation(len(spectra))
+spectra[perm] = spectra
+############################## To be changed to accomodate arbitrary satellite numbers ########################################################################################
 sat_spectrum = spectra[[0, 4]]
 
 freqs = np.linspace(800, 1800, 4096)
@@ -156,11 +167,7 @@ source_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
 source_spectrogram[1,:,3300:3450,0] = (200e3*np.random.rand()+200e3)*np.ones((1, 1))*sat_spectrum[None, 0, :]
 source_spectrogram[2,:,1600:1750,0] = (67e3*np.random.rand()+67e3)*np.ones((1, 1))*sat_spectrum[None, 1, :]
 
-# Get lm tracks of satellites
-
-lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs)
-
-astro_lm = (0.0, 0.0)
+###################################################################################################################################
 
 # Set number of channels and antennas
 
