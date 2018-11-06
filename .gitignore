@@ -5,5 +5,5 @@ notebooks/
 utils/sat_sim/sat_spectra.npy
 utils/sat_sim/sat_spectra/spectra_images
 utils/beam_sim/beams/
-**/.ipynb_checkpoints
-**/__init__.pyc
+*.ipynb_checkpoints
+*.pyc
