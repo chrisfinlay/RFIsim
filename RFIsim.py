@@ -120,10 +120,10 @@ slvr_cfg = montblanc.rime_solver_cfg(mem_budget=6*1024*1024*1024,
 
 target_ra = 21.4439
 target_dec = -30.713199999999997
-target_ra, target_dec = 0., 0.
+#target_ra, target_dec = 0., 0.
 tracking_hours = 0.1
 integration_secs = 8
-obs_date = '2018/10/18'
+obs_date = '2018/11/07'
 
 # Create UV tracks
 
