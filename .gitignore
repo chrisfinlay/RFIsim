@@ -1,3 +1,4 @@
+*.ipynb
 *.h5
 /*.npy
 montblanc.log

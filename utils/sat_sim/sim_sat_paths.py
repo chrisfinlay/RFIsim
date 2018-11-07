@@ -23,7 +23,7 @@ def radec_to_lm(ra, dec, phase_centre):
             l and m coordinates.
     """
     phase_centre = np.deg2rad(phase_centre)
-        
+
     delta_ra = ra - phase_centre[0]
     dec_0 = phase_centre[1]
 
@@ -35,10 +35,10 @@ def radec_to_lm(ra, dec, phase_centre):
 
 # Extract TLEs from TLE files
 def read_tles(tle_dir='utils/sat_sim/TLEs/'):
-    """	
+    """
     tle_dir : Path to the directory containing TLE .txt files
-    
-    Returns : 
+
+    Returns :
         sats : List of lists. Each internal list has the 3 lines of a TLEs as its elements.
     """
 
@@ -51,20 +51,20 @@ def read_tles(tle_dir='utils/sat_sim/TLEs/'):
     return sats
 
 def set_observer(date, telescope='meerkat'):
-    """ 
+    """
     date      : Datetime object with the start time of the observation.
     telescope : String giving the telescope name that is used to search a database.
-    
+
     Returns:
-        obs   : PyEphem Observer object 
+        obs   : PyEphem Observer object
     """
-    
+
     obs = ephem.Observer()
     obs.epoch = ephem.J2000
     obs.lon = np.rad2deg(measures().observatory(telescope)['m0']['value'])
     obs.lat = np.rad2deg(measures().observatory(telescope)['m1']['value'])
     obs.date = date.strftime('%Y/%m/%d %H:%M:%S')
-    
+
     return obs
 
 # Get l,m and altitude of every satellite
@@ -82,20 +82,20 @@ def get_lm_and_alt(args):
 
 # Get visible satellites
 def get_visible_sats(lm_alt):
-    """ 
+    """
     lm_alt         : Array of shape [time, sats, 3]. It contains all the l,m and altitude of every satellite for every time step.
 
     Returns :
-        lm_alt_vis : Array with only satellites that are visible at some time in the observation. 
+        lm_alt_vis : Array with only satellites that are visible at some time in the observation.
                      l, m is set to -0.5 (outside of 30 deg beam) if below the horizon.
     """
     r = np.sqrt(lm_alt[:,:,0]**2+lm_alt[:,:,1]**2)
     visible = ((lm_alt[:,:,-1]>0) & (r<np.deg2rad(30))).astype(int)
 
-    idx_vis = np.where(np.sum(vis, axis=0)>0)[0]
+    idx_vis = np.where(np.sum(visible, axis=0)>0)[0]
     lm_alt_vis = lm_alt[:,idx_vis,:]
 
-    invis = np.where(all_time[:,idx_vis,-1]<0)
+    invis = np.where(lm_alt[:,idx_vis,-1]<0)
     lm_alt_vis[invis[0], invis[1], :2] = -0.5
 
     return lm_alt_vis[:,:,:2]
@@ -132,6 +132,3 @@ def get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_se
     lm = get_visible_sats(all_time)
 
     return lm
-
-
-
