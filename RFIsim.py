@@ -7,8 +7,10 @@ from montblanc.impl.rime.tensorflow.sources import FitsBeamSourceProvider
 from montblanc.impl.rime.tensorflow.sinks import SinkProvider
 import montblanc.util as mbu
 
+import time as tme
+
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Internal imports
 from utils.uv_sim.uvgen import UVCreate
@@ -71,16 +73,6 @@ class CustomSourceProvider(SourceProvider):
         bp = bandpass*bp
         return bp[lt:ut, la:ua, lc:uc, lp:up]
 
-#     def observed_vis
-
-#     def model_vis(self, context):
-#         if self.noise != 0:
-#             n = np.random.randn(*context.shape) * self.noise + \
-#                 np.random.randn(*context.shape) * self.noise * 1j
-#         else:
-#             n = np.zeros(shape=context.shape, dtype=context.dtype)
-#         return n
-
     def uvw(self, context):
         """ Supply UVW antenna coordinates to montblanc """
 
@@ -125,24 +117,23 @@ class CustomSinkProvider(SinkProvider):
         extents = context.array_extents(context.name)
         (lt, ut), (lbl, ubl), (lc, uc), (lp, up) = extents
         global vis
+        noise = context.data/20
+        context_shape = (ut-lt, ubl-lbl, uc-lc, up-lp)
+        complex_noise = np.random.randn(*context_shape) * noise + \
+                        np.random.randn(*context_shape) * noise * 1j
         if j==0:
-            vis[i, lbl:ubl, lc:uc, lp:up] = context.data
+            vis[i, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise
         else:
-            vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data
-#         try:
-#             vis = np.load("vis.npy")
-#             vis = np.concatenate((vis, context.data), axis=0)
-#             np.save("vis.npy", vis)
-#         except:
-#             np.save("vis.npy", context.data)
+            vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise
 
+        return vis
 
 ########## Configuration #######################################################
 
-# Configure montblanc solver with a memory budget of 4GB
+# Configure montblanc solver with a memory budget of 1.7GB
 # and set it to double precision floating point accuracy
 
-slvr_cfg = montblanc.rime_solver_cfg(mem_budget=4*1024*1024*1024,
+slvr_cfg = montblanc.rime_solver_cfg(mem_budget=int(1.7*1024*1024*1024),
                                      dtype='double')
 
 ######### Solver Definition ####################################################
@@ -163,7 +154,7 @@ def call_solver():
 
 
 ########## Run Simulation ######################################################
-
+start = tme.time()
 # Set number of channels and antennas
 
 ntime = 1
@@ -230,7 +221,7 @@ full_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
 
 #### Create rough RFI frequency probability distribution #######################
 
-samples = np.random.randint(0, 4096-150, size=(int(1e6)))
+samples = np.random.randint(0, nchan-channels, size=(int(1e6)))
 rfi_p = np.concatenate((samples[(samples>330) & (samples<400)],
                       samples[(samples>1040) & (samples<1050)],
                       samples[(samples>1320) & (samples<2020)],
@@ -240,7 +231,6 @@ rfi_p = np.concatenate((rfi_p, np.random.randint(0, nchan-channels,
 perm = np.random.permutation(len(rfi_p))
 rfi_p = rfi_p[perm]
 
-# freq_i = np.random.randint(0, nchan-channels, size=n_sats)
 freq_i = rfi_p[:n_sats]
 freq_f = freq_i + channels
 for i in range(n_sats):
@@ -308,8 +298,12 @@ with h5py.File(save_file, 'a') as fp:
     fp['/input/cross_pol_gains'] = antenna_gains_cross
 
 # Run simulation twice - once with RFI and once without
+run_start = []
 
 for j in range(2):
+
+    run_start.append(tme.time())
+    print('\n\nInitialization time : {} s\n\n'.format(run_start[j]-start))
 
     vis = np.zeros(shape=(len(lm), na*(na-1)/2, nchan, 4),
                           dtype=np.complex128)
@@ -333,3 +327,5 @@ for j in range(2):
     else:
         with h5py.File(save_file, 'a') as fp:
             fp['/output/vis_clean'] = vis
+
+    print('\n\nCompletion time : {} s\n\n'.format(tme.time()-start))
