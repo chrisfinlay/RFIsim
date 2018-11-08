@@ -116,11 +116,17 @@ slvr_cfg = montblanc.rime_solver_cfg(mem_budget=6*1024*1024*1024,
 
 ########## Run Simulation ######################################################################################################################
 
+# Set number of channels and antennas
+
+ntime = 1
+nchan = 4096
+na = 64
+
 # Define target, track length and integration time
 
 target_ra = 21.4439
 target_dec = -30.713199999999997
-#target_ra, target_dec = 0., 0.
+# target_ra, target_dec = 0., 0.
 tracking_hours = 0.1
 integration_secs = 8
 obs_date = '2018/11/07'
@@ -143,30 +149,44 @@ for i in range(nant):
         A2[k] = j
         k += 1
 
+# Get lm tracks of satellites
+# lm shape (time_steps, vis_sats, 2)
+lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs)
+time_steps, n_sats = lm.shape[:2]
+
+astro_lm = np.array([
+                    [0.0, 0.0],
+                    # [0.1, 0.0]
+                    ])[None,:,:]*np.ones((time_steps, 1, 1))
+
+all_lm = np.concatenate((astro_lm, lm), axis=1)
+
 # Create frequency spectrum array
+np.random.seed(123)
 
 spectra = np.load('utils/sat_sim/sat_spectra/Satellite_Frequency_Spectra.npy')
-sat_spectrum = spectra[[0, 4]]
+perm = np.random.permutation(len(spectra))
+spectra[perm] = spectra
+
+n_spectra, channels = spectra.shape
+n_srcs = 1
+wraps = n_sats/n_spectra+1
+wrapped_spectra = np.array([spectra for i in range(wraps)]).reshape(-1, channels)
+sat_spectrum = wrapped_spectra[:n_sats]
+sat_spectrum *= (1e5*np.random.rand(n_sats)+1e4)[:,None]
+
+source_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
+freq_starts = np.random.randint(0, nchan-channels, size=n_sats)
+freq_ends = freq_starts + channels
+for i in range(n_sats):
+    source_spectrogram[n_srcs+i, 0, freq_starts[i]:freq_ends[i], 0] = sat_spectrum[i]
+############################## To be changed to accomodate arbitrary satellite numbers ########################################################################################
 
 freqs = np.linspace(800, 1800, 4096)
 source_spec = (freqs[-1]/freqs)**0.667
-source_spectrogram = np.zeros((3, 1, 4096, 1))
-
 source_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
-source_spectrogram[1,:,3300:3450,0] = (200e3*np.random.rand()+200e3)*np.ones((1, 1))*sat_spectrum[None, 0, :]
-source_spectrogram[2,:,1600:1750,0] = (67e3*np.random.rand()+67e3)*np.ones((1, 1))*sat_spectrum[None, 1, :]
 
-# Get lm tracks of satellites
-
-lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs)
-
-astro_lm = (0.0, 0.0)
-
-# Set number of channels and antennas
-
-ntime = 1
-nchan = 4096
-na = 64
+###################################################################################################################################
 
 bandpass = np.load('utils/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy').astype(np.complex128)
 FITSfiles = 'utils/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
@@ -187,10 +207,24 @@ with h5py.File(save_file, 'a') as fp:
     fp['/input/bandpass'] = bandpass
 
 # Stokes parameters (I, Q, U, V)
-lm_stokes = [(1.0, 0.0, 0.0, 0.0),
-             (1.0, 1.0, 0.0, 0.0),
-             (1.0, 0.0, 1.0, 0.0),
-            ]
+stokes_sats = np.random.randint(1, 4, size=n_sats)
+signs = (-1)**np.random.randint(0, 2, size=n_sats)
+lm_stokes_sats = np.zeros((n_sats, 4))
+lm_stokes_sats[:, 0] = 1.0
+for i in range(n_sats):
+    lm_stokes_sats[i, stokes_sats[i]] = signs[i]
+
+stokes_srcs = np.array([
+                        [1.0, 0.0, 0.0, 0.0],
+                        # [1.0, 0.0, 0.0, 0.0]
+                        ])
+
+lm_stokes = np.concatenate((stokes_srcs, lm_stokes_sats), axis=0)
+#
+# lm_stokes = [(1.0, 0.0, 0.0, 0.0),
+#              (1.0, 1.0, 0.0, 0.0),
+#              (1.0, 0.0, 1.0, 0.0),
+#             ]
 
 # Save input spectra
 s = np.asarray(lm_stokes, dtype=np.float64)[:,None,None,:]
@@ -225,13 +259,10 @@ for j in range(2):
     for i in range(len(lm)):
         # LM coordinates
         if j==0:
-            lm_coords = [astro_lm,
-                         (lm[i,0,0], lm[i,0,1]),
-                         (lm[i,1,0], lm[i,1,1]),
-                        ]
+            lm_coords = all_lm[i]
         else:
-            lm_coords = [astro_lm]
-            
+            lm_coords = all_lm[0, :n_srcs, :]
+
         # Create montblanc solver
         with montblanc.rime_solver(slvr_cfg) as slvr:
 
