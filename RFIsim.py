@@ -32,11 +32,18 @@ class CustomSourceProvider(SourceProvider):
 
     def updated_dimensions(self):
         """ Inform montblanc about dimension sizes """
-        return [("ntime", ntime),          # Timesteps
-                ("nchan", nchan),          # Channels
-                ("na", na),                # Antenna
-                ("nbl", na*(na-1)/2),      # Baselines
-                ("npsrc", len(lm_coords))] # Number of point sources
+        if j==0:
+            return [("ntime", ntime),          # Timesteps
+                    ("nchan", nchan),          # Channels
+                    ("na", na),                # Antenna
+                    ("nbl", na*(na-1)/2),      # Baselines
+                    ("npsrc", len(lm_coords))] # Number of point sources
+        else:
+            return [("ntime", time_steps),     # Timesteps
+                    ("nchan", nchan),          # Channels
+                    ("na", na),                # Antenna
+                    ("nbl", na*(na-1)/2),      # Baselines
+                    ("npsrc", len(lm_coords))] # Number of point sources
 
     def point_lm(self, context):
         """ Supply point source lm coordinates to montblanc """
@@ -44,20 +51,25 @@ class CustomSourceProvider(SourceProvider):
         # Shape (npsrc, 2)
         (ls, us), _ = context.array_extents(context.name)
 
-        return np.asarray(lm_coords[ls:us], dtype=context.dtype)[ls:us, :]
+        return np.asarray(lm_coords, dtype=context.dtype)[ls:us, :]
 
     def point_stokes(self, context):
         extents = context.dim_extents('npsrc', 'ntime', 'nchan')
         (lp, up), (lt, ut), (lc, uc) = extents
         # (npsrc, ntime, nchan, 4)
 
-        return spectra[lp:up, lt:up, lc:uc, :]
+        spec = np.ones((1, time_steps, 1, 1))
+        spec = spectra*spec
+        return spec[lp:up, lt:ut, lc:uc, :]
 
     def direction_independent_effects(self, context):
         # (ntime, na, nchan, npol)
         extents = context.dim_extents('ntime', 'na', 'nchan', 'npol')
         (lt, ut), (la, ua), (lc, uc), (lp, up) = extents
-        return bandpass[lt:ut, la:ua, lc:uc, lp:up]
+
+        bp = np.ones((time_steps, 1, 1, 1))
+        bp = bandpass*bp
+        return bp[lt:ut, la:ua, lc:uc, lp:up]
 
 #     def observed_vis
 
@@ -75,9 +87,20 @@ class CustomSourceProvider(SourceProvider):
         # Shape (ntime, na, 3)
         (lt, ut), (la, ua), (l, u) = context.array_extents(context.name)
 
-        idx = np.arange(i*2016, (i+1)*2016)
-        auvw = mbu.antenna_uvw(UVW[idx], A1, A2, np.array([2016,]),
-                               nr_of_antenna=na)
+        if j==0:
+            idx = np.arange(i*2016, (i+1)*2016)
+            auvw = mbu.antenna_uvw(UVW[idx], A1, A2, np.array([2016,]),
+                                   nr_of_antenna=na)
+        else:
+            AA1 = []
+            AA2 = []
+            for _ in range(UVW.shape[0]/2016):
+                AA1 += list(A1)
+                AA2 += list(A2)
+            AA1 = np.array(AA1)
+            AA2 = np.array(AA2)
+            chunks = np.array(UVW.shape[0]/2016*[na*(na-1)/2], dtype=np.int)
+            auvw = mbu.antenna_uvw(UVW, AA1, AA2, chunks, nr_of_antenna=na)
 
         return auvw[lt:ut, la:ua, l:u]
 
@@ -99,7 +122,13 @@ class CustomSinkProvider(SinkProvider):
 
     def model_vis(self, context):
         """ Receive model visibilities from Montblanc in `context.data` """
-        vis[i] = context.data
+        extents = context.array_extents(context.name)
+        (lt, ut), (lbl, ubl), (lc, uc), (lp, up) = extents
+        global vis
+        if j==0:
+            vis[i, lbl:ubl, lc:uc, lp:up] = context.data
+        else:
+            vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data
 #         try:
 #             vis = np.load("vis.npy")
 #             vis = np.concatenate((vis, context.data), axis=0)
@@ -110,11 +139,28 @@ class CustomSinkProvider(SinkProvider):
 
 ########## Configuration #######################################################
 
-# Configure montblanc solver with a memory budget of 6GB
+# Configure montblanc solver with a memory budget of 4GB
 # and set it to double precision floating point accuracy
 
-slvr_cfg = montblanc.rime_solver_cfg(mem_budget=6*1024*1024*1024,
+slvr_cfg = montblanc.rime_solver_cfg(mem_budget=4*1024*1024*1024,
                                      dtype='double')
+
+######### Solver Definition ####################################################
+
+def call_solver():
+    # Create montblanc solver
+    with montblanc.rime_solver(slvr_cfg) as slvr:
+
+        # Create Customer Source and Sink Providers
+        source_provs = [CustomSourceProvider(),
+                        FitsBeamSourceProvider(FITSfiles)
+                       ]
+        sink_provs = [CustomSinkProvider()]
+
+        # Call solver, supplying source and sink providers
+        slvr.solve(source_providers=source_provs,
+                sink_providers=sink_provs)
+
 
 ########## Run Simulation ######################################################
 
@@ -181,7 +227,21 @@ sat_spectrum = wrapped_spectra[:n_sats]
 sat_spectrum *= (1e5*np.random.rand(n_sats)+1e4)[:,None]
 
 full_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
-freq_i = np.random.randint(0, nchan-channels, size=n_sats)
+
+#### Create rough RFI frequency probability distribution #######################
+
+samples = np.random.randint(0, 4096-150, size=(int(1e6)))
+rfi_p = np.concatenate((samples[(samples>330) & (samples<400)],
+                      samples[(samples>1040) & (samples<1050)],
+                      samples[(samples>1320) & (samples<2020)],
+                      samples[(samples>3120) & (samples<3520)]))
+rfi_p = np.concatenate((rfi_p, np.random.randint(0, nchan-channels,
+                                                 size=len(rfi_p))))
+perm = np.random.permutation(len(rfi_p))
+rfi_p = rfi_p[perm]
+
+# freq_i = np.random.randint(0, nchan-channels, size=n_sats)
+freq_i = rfi_p[:n_sats]
 freq_f = freq_i + channels
 for i in range(n_sats):
     full_spectrogram[n_srcs+i, 0, freq_i[i]:freq_f[i], 0] = sat_spectrum[i]
@@ -251,34 +311,19 @@ with h5py.File(save_file, 'a') as fp:
 
 for j in range(2):
 
-    vis = np.zeros(shape=(len(lm), na*(na-1)/2, nchan, 4), dtype=np.complex128)
+    vis = np.zeros(shape=(len(lm), na*(na-1)/2, nchan, 4),
+                          dtype=np.complex128)
 
     if j==1:
-        spectra = (spectra[0])[None, :, :, :]
-        lm_stokes = [lm_stokes[0]]
-
-
-    for i in range(len(lm)):
-        # LM coordinates
-        if j==0:
+        spectra = spectra[:n_srcs]
+        lm_stokes = lm_stokes[:n_srcs]
+        lm_coords = all_lm[0, :n_srcs, :]
+        call_solver()
+    else:
+        for i in range(len(lm)):
+            # LM coordinates
             lm_coords = all_lm[i]
-        else:
-            lm_coords = all_lm[0, :n_srcs, :]
-
-        # Create montblanc solver
-        with montblanc.rime_solver(slvr_cfg) as slvr:
-
-#         ms_mgr = MeasurementSetManager('MeerKAT_data/AP_Lib_0.ms', slvr_cfg)
-
-            # Create Customer Source and Sink Providers
-            source_provs = [CustomSourceProvider(),
-                            FitsBeamSourceProvider(FITSfiles)
-                           ]
-            sink_provs = [CustomSinkProvider()]
-
-            # Call solver, supplying source and sink providers
-            slvr.solve(source_providers=source_provs,
-                    sink_providers=sink_provs)
+            call_solver()
 
     # Save output
     if j==0:
