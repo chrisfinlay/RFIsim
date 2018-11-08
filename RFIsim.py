@@ -1,10 +1,9 @@
 import h5py
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 
 import montblanc
-from montblanc.impl.rime.tensorflow.sources import SourceProvider, FitsBeamSourceProvider
+from montblanc.impl.rime.tensorflow.sources import SourceProvider
+from montblanc.impl.rime.tensorflow.sources import FitsBeamSourceProvider
 from montblanc.impl.rime.tensorflow.sinks import SinkProvider
 import montblanc.util as mbu
 
@@ -15,7 +14,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 from utils.uv_sim.uvgen import UVCreate
 from utils.sat_sim.sim_sat_paths import get_lm_tracks
 
-######## Source Provider #########################################################################################
+######## Source Provider #######################################################
 
 class CustomSourceProvider(SourceProvider):
     """
@@ -36,8 +35,8 @@ class CustomSourceProvider(SourceProvider):
         return [("ntime", ntime),          # Timesteps
                 ("nchan", nchan),          # Channels
                 ("na", na),                # Antenna
-                ("nbl", na*(na-1)/2), # Baselines
-                ("npsrc", len(lm_coords))]      # Number of point sources
+                ("nbl", na*(na-1)/2),      # Baselines
+                ("npsrc", len(lm_coords))] # Number of point sources
 
     def point_lm(self, context):
         """ Supply point source lm coordinates to montblanc """
@@ -45,25 +44,27 @@ class CustomSourceProvider(SourceProvider):
         # Shape (npsrc, 2)
         (ls, us), _ = context.array_extents(context.name)
 
-        return np.asarray(lm_coords[ls:us], dtype=context.dtype)
+        return np.asarray(lm_coords[ls:us], dtype=context.dtype)[ls:us, :]
 
     def point_stokes(self, context):
-        (lp, up), (lt, ut), (lc, uc) = context.dim_extents('npsrc', 'ntime', 'nchan')
+        extents = context.dim_extents('npsrc', 'ntime', 'nchan')
+        (lp, up), (lt, ut), (lc, uc) = extents
         # (npsrc, ntime, nchan, 4)
 
-        return spectra
+        return spectra[lp:up, lt:up, lc:uc, :]
 
     def direction_independent_effects(self, context):
         # (ntime, na, nchan, npol)
-        (lt, ut), (la, ua), (lc, uc), (lpol, upol) = context.dim_extents('ntime', 'na', 'nchan', 'npol')
-
-        return bandpass
+        extents = context.dim_extents('ntime', 'na', 'nchan', 'npol')
+        (lt, ut), (la, ua), (lc, uc), (lp, up) = extents
+        return bandpass[lt:ut, la:ua, lc:uc, lp:up]
 
 #     def observed_vis
 
 #     def model_vis(self, context):
 #         if self.noise != 0:
-#             n = np.random.randn(*context.shape) * self.noise + np.random.randn(*context.shape) * self.noise * 1j
+#             n = np.random.randn(*context.shape) * self.noise + \
+#                 np.random.randn(*context.shape) * self.noise * 1j
 #         else:
 #             n = np.zeros(shape=context.shape, dtype=context.dtype)
 #         return n
@@ -75,11 +76,12 @@ class CustomSourceProvider(SourceProvider):
         (lt, ut), (la, ua), (l, u) = context.array_extents(context.name)
 
         idx = np.arange(i*2016, (i+1)*2016)
-        auvw = mbu.antenna_uvw(UVW[idx], A1, A2, np.array([2016,]), nr_of_antenna=na)
+        auvw = mbu.antenna_uvw(UVW[idx], A1, A2, np.array([2016,]),
+                               nr_of_antenna=na)
 
-        return auvw
+        return auvw[lt:ut, la:ua, l:u]
 
-######### Sink Provider #################################################################################################
+######### Sink Provider ########################################################
 
 class CustomSinkProvider(SinkProvider):
     """
@@ -106,7 +108,7 @@ class CustomSinkProvider(SinkProvider):
 #             np.save("vis.npy", context.data)
 
 
-########## Configuration ############################################################################################################
+########## Configuration #######################################################
 
 # Configure montblanc solver with a memory budget of 6GB
 # and set it to double precision floating point accuracy
@@ -114,7 +116,7 @@ class CustomSinkProvider(SinkProvider):
 slvr_cfg = montblanc.rime_solver_cfg(mem_budget=6*1024*1024*1024,
                                      dtype='double')
 
-########## Run Simulation ######################################################################################################################
+########## Run Simulation ######################################################
 
 # Set number of channels and antennas
 
@@ -134,14 +136,16 @@ obs_date = '2018/11/07'
 # Create UV tracks
 
 direction = 'J2000,'+str(target_ra)+'deg,'+str(target_dec)+'deg'
-uv = UVCreate(antennas='utils/uv_sim/MeerKAT.enu.txt', direction=direction, tel='meerkat', coord_sys='enu')
+uv = UVCreate(antennas='utils/uv_sim/MeerKAT.enu.txt', direction=direction,
+              tel='meerkat', coord_sys='enu')
 ha = -tracking_hours/2, tracking_hours/2
 transit, UVW = uv.itrf2uvw(h0=ha, dtime=integration_secs/3600., date=obs_date)
 
 # Get antenna baseline pairings
 
 nant = 64
-A1, A2 = np.empty(nant*(nant-1)/2, dtype=np.int32), np.empty(nant*(nant-1)/2, dtype=np.int32)
+A1 = np.empty(nant*(nant-1)/2, dtype=np.int32)
+A2 = np.empty(nant*(nant-1)/2, dtype=np.int32)
 k = 0
 for i in range(nant):
     for j in range(i+1,nant):
@@ -149,9 +153,9 @@ for i in range(nant):
         A2[k] = j
         k += 1
 
-# Get lm tracks of satellites
-# lm shape (time_steps, vis_sats, 2)
-lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs)
+#### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats, 2) ######
+lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
+                   integration_secs)
 time_steps, n_sats = lm.shape[:2]
 
 astro_lm = np.array([
@@ -171,36 +175,39 @@ spectra[perm] = spectra
 n_spectra, channels = spectra.shape
 n_srcs = 1
 wraps = n_sats/n_spectra+1
-wrapped_spectra = np.array([spectra for i in range(wraps)]).reshape(-1, channels)
+wrapped_spectra = np.array([spectra for i in range(wraps)])
+wrapped_spectra = wrapped_spectra.reshape(-1, channels)
 sat_spectrum = wrapped_spectra[:n_sats]
 sat_spectrum *= (1e5*np.random.rand(n_sats)+1e4)[:,None]
 
-source_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
-freq_starts = np.random.randint(0, nchan-channels, size=n_sats)
-freq_ends = freq_starts + channels
+full_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
+freq_i = np.random.randint(0, nchan-channels, size=n_sats)
+freq_f = freq_i + channels
 for i in range(n_sats):
-    source_spectrogram[n_srcs+i, 0, freq_starts[i]:freq_ends[i], 0] = sat_spectrum[i]
-############################## To be changed to accomodate arbitrary satellite numbers ########################################################################################
+    full_spectrogram[n_srcs+i, 0, freq_i[i]:freq_f[i], 0] = sat_spectrum[i]
+#### To be changed to accomodate arbitrary astronomical sources ################
 
 freqs = np.linspace(800, 1800, 4096)
 source_spec = (freqs[-1]/freqs)**0.667
-source_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
+full_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
 
-###################################################################################################################################
+################################################################################
 
-bandpass = np.load('utils/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy').astype(np.complex128)
+bandpass_file = 'utils/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy'
+bandpass = np.load(bandpass_file).astype(np.complex128)
 FITSfiles = 'utils/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
 
 # Set file name to save data to
 
-save_file = 'ra=' + str(target_ra) + '_dec=' + str(target_dec) + '_int_secs=' + \
-            str(integration_secs) + '_track-time=' + str(round(tracking_hours, 1)) + 'hrs_nants=' + \
-            str(nant) + '_nchan=' + str(nchan) + '.h5'
+save_file = 'ra=' + str(target_ra) + '_dec=' + str(target_dec) + \
+            '_int_secs=' + str(integration_secs) + \
+            '_track-time=' + str(round(tracking_hours, 1)) + \
+            'hrs_nants=' + str(nant) + '_nchan=' + str(nchan) + '.h5'
 
 
 # Need to change the number of sources variably
 with h5py.File(save_file, 'a') as fp:
-    fp['/input/lm'] = np.concatenate((np.ones((len(lm), 1, 2))*astro_lm, lm), axis=1)
+    fp['/input/lm'] = all_lm
     fp['/input/UVW'] = UVW
     fp['/input/A1'] = A1
     fp['/input/A2'] = A2
@@ -220,15 +227,10 @@ stokes_srcs = np.array([
                         ])
 
 lm_stokes = np.concatenate((stokes_srcs, lm_stokes_sats), axis=0)
-#
-# lm_stokes = [(1.0, 0.0, 0.0, 0.0),
-#              (1.0, 1.0, 0.0, 0.0),
-#              (1.0, 0.0, 1.0, 0.0),
-#             ]
 
 # Save input spectra
 s = np.asarray(lm_stokes, dtype=np.float64)[:,None,None,:]
-spectra = s*source_spectrogram
+spectra = s*full_spectrogram
 
 with h5py.File(save_file, 'a') as fp:
     fp['/input/spectra'] = spectra
@@ -266,7 +268,7 @@ for j in range(2):
         # Create montblanc solver
         with montblanc.rime_solver(slvr_cfg) as slvr:
 
-    #         ms_mgr = MeasurementSetManager('MeerKAT_data/AP_Lib_0.ms', slvr_cfg)
+#         ms_mgr = MeasurementSetManager('MeerKAT_data/AP_Lib_0.ms', slvr_cfg)
 
             # Create Customer Source and Sink Providers
             source_provs = [CustomSourceProvider(),
