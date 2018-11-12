@@ -8,3 +8,4 @@ utils/beam_sim/beams/
 **/.ipynb_checkpoints
 *.pyc
 *.lsm
+/utils/catalogues
