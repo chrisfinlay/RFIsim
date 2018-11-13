@@ -10,5 +10,4 @@ utils/beam_sim/beams/
 *.lsm
 /utils/catalogues/NVSSCatalog*
 /utils/catalogues/sumsscat.Mar-11-2008*
-/utils/catalogues/NVSS_Catalogue.csv*
-/utils/catalogues/SUMSS_Catalogue.csv*
+*.csv
