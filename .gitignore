@@ -1,9 +1,7 @@
 notebooks/
-utils/sat_sim/sat_spectra/sat_spectra.npy
-utils/sat_sim/sat_spectra/spectra_images
 utils/beam_sim/beams/
-/utils/catalogues/NVSSCatalog*
-/utils/catalogues/sumsscat.Mar-11-2008*
+utils/catalogues/originals/
+utils/sat_sim/sat_spectra/spectra_images/
 montblanc.log
 *.pyc
 *.lsm
