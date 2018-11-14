@@ -22,7 +22,9 @@ To get the docker environment running to use this tool simply run the following 
 docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-py2-new
 cd /data
 git clone https://github.com/chrisfinlay/RFIsim.git
-cd RFIsim
+cd /data/RFIsim/utils/catalogues
+unzip SUMSS_NVSS_Clean.csv.zip
+cd /data/RFIsim
 python utils/beam_sim/create_beam.py
 python RFIsim.py
 ```
@@ -36,7 +38,6 @@ python RFIsim.py
 ## Authors
 
 * **Chris Finlay** - [LinkedIn](https://www.linkedin.com/in/chris-finlay/)
-* **Nadeem Oozeer** - [LinkedIn](https://www.linkedin.com/in/oozeer-nadeem-100776b2/)
 
 ## License
 
@@ -47,3 +48,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 * Simon Perkins (For all the help with understanding Montblanc, his baby)
 * Michelle Lochner
 * Bruce Bassett
+* Nadeem Oozeer
+* NVSS
+* SUMSS

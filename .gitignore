@@ -2,7 +2,7 @@ notebooks/
 utils/beam_sim/beams/
 utils/catalogues/originals/
 utils/sat_sim/sat_spectra/spectra_images/
-montblanc.log
+montblanc.log*
 *.pyc
 *.lsm
 *.csv

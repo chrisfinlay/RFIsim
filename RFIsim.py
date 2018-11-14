@@ -14,7 +14,8 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Internal imports
 from utils.uv_sim.uvgen import UVCreate
-from utils.sat_sim.sim_sat_paths import get_lm_tracks
+from utils.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
+from utils.catalogues.get_ast_sources import inview
 
 ######## Source Provider #######################################################
 
@@ -35,17 +36,19 @@ class CustomSourceProvider(SourceProvider):
     def updated_dimensions(self):
         """ Inform montblanc about dimension sizes """
         if j==0:
-            return [("ntime", ntime),          # Timesteps
-                    ("nchan", nchan),          # Channels
-                    ("na", na),                # Antenna
-                    ("nbl", na*(na-1)/2),      # Baselines
-                    ("npsrc", len(lm_coords))] # Number of point sources
+            return [("ntime", ntime),              # Timesteps
+                    ("nchan", nchan),              # Channels
+                    ("na", na),                    # Antenna
+                    ("nbl", na*(na-1)/2),          # Baselines
+                    ("npsrc", len(lm_coords)),     # Number of point sources
+                    ("ngsrc", len(gauss_sources))] # Number of gaussian sources
         else:
-            return [("ntime", time_steps),     # Timesteps
-                    ("nchan", nchan),          # Channels
-                    ("na", na),                # Antenna
-                    ("nbl", na*(na-1)/2),      # Baselines
-                    ("npsrc", len(lm_coords))] # Number of point sources
+            return [("ntime", time_steps),         # Timesteps
+                    ("nchan", nchan),              # Channels
+                    ("na", na),                    # Antenna
+                    ("nbl", na*(na-1)/2),          # Baselines
+                    ("npsrc", len(lm_coords)),     # Number of point sources
+                    ("ngsrc", len(gauss_sources))] # Number of gaussian sources
 
     def point_lm(self, context):
         """ Supply point source lm coordinates to montblanc """
@@ -63,6 +66,61 @@ class CustomSourceProvider(SourceProvider):
         spec = np.ones((1, time_steps, 1, 1))
         spec = spectra*spec
         return spec[lp:up, lt:ut, lc:uc, :]
+
+######## New ############################################################################
+
+    def gaussian_lm(self, context):
+        """ Returns an lm coordinate array to Montblanc. """
+
+        # lm = np.empty(context.shape, context.dtype)
+        lm = np.empty((len(gauss_sources), 2), context.dtype)
+
+        # Get the extents of the time, baseline and chan dimension
+        (lg, ug) = context.dim_extents('ngsrc')
+
+        ra = gauss_sources['RA']
+        dec = gauss_sources['DEC']
+        phase_centre = [target_ra, target_dec]
+
+        lm[:,0], lm[:,1] = radec_to_lm(ra, dec, phase_centre)
+
+        return lm[lg:ug]
+
+    def gaussian_shape(self, context):
+        """ Returns a Gaussian shape array to Montblanc """
+
+        (lg, ug) = context.dim_extents('ngsrc')
+
+        emaj = np.deg2rad(gauss_sources['MajAxis'].values)
+        emin = np.deg2rad(gauss_sources['MinAxis'].values)
+        pa = np.deg2rad(gauss_sources['PA'].values)
+
+        # gauss = np.empty(context.shape, dtype=context.dtype)
+        gauss = np.empty((3, len(gauss_sources)), context.dtype)
+
+        gauss[0,:] = emaj * np.sin(pa)
+        gauss[1,:] = emaj * np.cos(pa)
+        emaj[emaj == 0.0] = 1.0
+        gauss[2,:] = emin / emaj
+
+        return gauss[:,lg:ug]
+
+    def gaussian_stokes(self, context):
+        """ Return a stokes parameter array to Montblanc """
+
+        # Get the extents of the time, baseline and chan dimension
+        extents = context.dim_extents('ngsrc', 'ntime', 'nchan')
+        (lg, ug), (lt, ut), (lc, uc) = extents
+        print(context.shape)
+        # stokes = np.empty(context.shape, context.dtype)
+        stokes = np.empty((len(gauss_sources), 1, uc-lc, 4), context.dtype)
+
+        stokes[:,:,:,0] = gauss_sources['Flux'].values[:,None,None]
+        stokes[:,:,:,1:] = 0.0
+
+        return stokes[lg:ug]
+
+######################################################################################
 
     def direction_independent_effects(self, context):
         # (ntime, na, nchan, npol)
@@ -189,6 +247,10 @@ for i in range(nant):
         A1[k] = i
         A2[k] = j
         k += 1
+
+# Get astronomical sources
+
+gauss_sources = inview([target_ra, target_dec], radius=10, min_flux=0.1)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats, 2) ######
 lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours,

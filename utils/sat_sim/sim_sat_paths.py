@@ -7,41 +7,50 @@ import sys
 sys.path.insert(0, '../..')
 from utils.parallelize import parmap
 
-# Convert RA and DEC coordinates to l and m given a phase centre
 def radec_to_lm(ra, dec, phase_centre):
     """
     Convert right-ascension and declination to direction cosines.
-    Args:
-        ra (float):
-            Right-ascension in degrees.
-        dec (float):
-            Declination in degrees.
-        phase_center (np.ndarray):
-            The coordinates of the phase center.
-    Returns:
-        tuple:
-            l and m coordinates.
+
+    Parameters
+    ----------
+    ra : array_like (float)
+        Right-ascension in degrees.
+    dec : array_like (float)
+        Declination in degrees.
+    phase_center : array_like (float)
+        The coordinates of the phase centre in degrees.
+
+    Returns
+    -------
+    (l,m) : tuple
+        l and m coordinates. The direction cosines.
     """
+    ra = np.deg2rad(ra)
+    dec = np.deg2rad(dec)
     phase_centre = np.deg2rad(phase_centre)
 
     delta_ra = ra - phase_centre[0]
     dec_0 = phase_centre[1]
 
-    l = np.cos(dec) * np.sin(delta_ra)
-    m = np.sin(dec) * np.cos(dec_0) - \
-        np.cos(dec) * np.sin(dec_0) * np.cos(delta_ra)
+    l = np.cos(dec)*np.sin(delta_ra)
+    m = np.sin(dec)*np.cos(dec_0) - np.cos(dec)*np.sin(dec_0)*np.cos(delta_ra)
 
     return l, m
 
-# Extract TLEs from TLE files
 def read_tles(tle_dir='utils/sat_sim/TLEs/'):
     """
-    tle_dir : Path to the directory containing TLE .txt files
+    Convert TLE text files in a given directory to a list of TLEs.
 
-    Returns :
-        sats : List of lists. Each internal list has the 3 lines of a TLEs as its elements.
+    Parameters
+    ----------
+    tle_dir : str
+        Path to the directory containing TLE .txt files.
+
+    Returns
+    -------
+    sats : List of lists.
+        Each internal list has the 3 lines of a TLE as its elements.
     """
-
     tlefiles = glob(tle_dir+'*.txt')
     tles = []
     for tlefile in tlefiles:
@@ -52,13 +61,20 @@ def read_tles(tle_dir='utils/sat_sim/TLEs/'):
 
 def set_observer(date, telescope='meerkat'):
     """
-    date      : Datetime object with the start time of the observation.
-    telescope : String giving the telescope name that is used to search a database.
+    Create a PyEphem Observer object.
 
-    Returns:
-        obs   : PyEphem Observer object
+    Parameters
+    ----------
+    date : datetime object
+        Start date and time of the observation.
+    telescope : str
+        Telescope name at the location of the observer.
+
+    Returns
+    -------
+    obs   : PyEphem Observer
+        An observer object that can be used to compute astronomical quantities.
     """
-
     obs = ephem.Observer()
     obs.epoch = ephem.J2000
     obs.lon = np.rad2deg(measures().observatory(telescope)['m0']['value'])
@@ -67,9 +83,28 @@ def set_observer(date, telescope='meerkat'):
 
     return obs
 
-# Get l,m and altitude of every satellite
 def get_lm_and_alt(args):
+    """
+    Calculate direction cosines and altitudes for satellite TLEs given an
+    observation date.
 
+    Parameters
+    ----------
+    args : tuple
+        3 element tuple containing (sats, obs_date, phase_centre).
+        sats : list
+            3 element lists containing TLE strings.
+        obs_date : datetime object
+            Observation time and date.
+        phase_centre : array_like
+            Right ascension and declination of phase centre (pointing centre).
+
+    Returns
+    -------
+    lmalt : ndarray
+        Array of shape (n_sats, 3) containing the direction cosines (l,m)
+        and altitude of satellites in sats.
+    """
     sats, obs_date, phase_centre = args
     obs = set_observer(obs_date)
     lmalt = np.zeros((len(sats), 3))
@@ -78,47 +113,75 @@ def get_lm_and_alt(args):
         sat.compute(obs)
         l, m = radec_to_lm(sat.ra, sat.dec, phase_centre)
         lmalt[i] = l, m, sat.alt
+
     return lmalt
 
-# Get visible satellites
-def get_visible_sats(lm_alt):
+def get_visible_sats(lm_alt, radius=30):
     """
-    lm_alt         : Array of shape [time, sats, 3]. It contains all the l,m and altitude of every satellite for every time step.
+    Get the satellites that are within the FoV and above the horizon.
 
-    Returns :
-        lm_alt_vis : Array with only satellites that are visible at some time in the observation.
-                     l, m is set to -0.5 (outside of 30 deg beam) if below the horizon.
+    Parameters
+    ----------
+    lm_alt : ndarray
+        Array of shape (time_steps, n_sats, 3). It contains all the l,m
+        coordinates and altitude of every satellite for every time step.
+    radius : float
+        Radial field of view in degrees.
+
+    Returns
+    -------
+    lm_alt_vis : ndarray
+        Only satellites that are visible at some time in the observation. If
+        satellite is below the horizon l and m are set to -0.7 (edge l,m plane).
     """
     r = np.sqrt(lm_alt[:,:,0]**2+lm_alt[:,:,1]**2)
-    visible = ((lm_alt[:,:,-1]>0) & (r<np.deg2rad(30))).astype(int)
+    visible = ((lm_alt[:,:,-1]>0) & (r<np.deg2rad(radius))).astype(int)
 
+    # Satellite must be visible for at least 1 time step
     idx_vis = np.where(np.sum(visible, axis=0)>0)[0]
     lm_alt_vis = lm_alt[:,idx_vis,:]
 
+    # Satellite must be above the horizon
     invis = np.where(lm_alt[:,idx_vis,-1]<0)
-    lm_alt_vis[invis[0], invis[1], :2] = -0.5
+    lm_alt_vis[invis[0], invis[1], :2] = -0.7
 
     return lm_alt_vis[:,:,:2]
 
-# Get l,m tracks for satellites (track time steps and integration time needed as well as visible satellite index)
-def get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_secs=8):
+def get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
+                  integration_secs=8):
+    """
+    Get the l,m tracks for all visible satellites through time.
 
-    # Define the phase centre
+    Parameters
+    ----------
+    target_ra : float
+        Right ascension of the target source in degrees.
+    target_dec : float
+        Declination of the target source in degrees.
+    transit : str
+        Time and date when the source is at its highest point (transit).
+        Formatted as '%a %b %d %H:%M:%S %Y'. See http://strftime.org/ .
+    tracking_hours : float
+        The total time the target source will be tracked in hours.
+    integration_secs : float
+        The integration time for each time step in seconds.
+
+    Returns
+    -------
+    lm : ndarray
+        Array of shape (time_steps, vis_sats, 2) containing the l,m tracks of
+        the visible satellites.
+    """
     phase_centre = [target_ra, target_dec]
 
-    # transit time and tracking_hours needed
     start_time = datetime.datetime.strptime(transit, '%a %b %d %H:%M:%S %Y') - \
                  datetime.timedelta(seconds=3600*tracking_hours/2)
 
-    # Set observer location and time
     ska = set_observer(start_time, telescope='meerkat')
-
-    # Read TLE files
     sats = read_tles()
-
-    # Set arguments for l,m and altitude calls
     time_steps = int(3600*tracking_hours/integration_secs)
 
+    # Set up argument list for parallelization
     obs_times = [start_time + datetime.timedelta(seconds=i*8) for i in range(time_steps)]
     all_obs = [set_observer(obs_times[i]) for i in range(len(obs_times))]
     all_sats = [sats for i in range(len(obs_times))]
@@ -127,8 +190,6 @@ def get_lm_tracks(target_ra, target_dec, transit, tracking_hours, integration_se
 
     # Call parallelization function to get l,m and altitude for all time steps
     all_time = np.array(parmap(get_lm_and_alt, arg_list, proc_power=0.8))
-
-    # Get visible satellite tracks lm is shape (time_steps, vis_sats, 2)
     lm = get_visible_sats(all_time)
 
     return lm
