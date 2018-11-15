@@ -41,13 +41,14 @@ class CustomSourceProvider(SourceProvider):
                     ("na", na),                    # Antenna
                     ("nbl", na*(na-1)/2),          # Baselines
                     ("npsrc", len(lm_coords)),     # Number of point sources
-                    ("ngsrc", len(gauss_sources))] # Number of gaussian sources
+                    ("ngsrc", 0)]                  # Number of gaussian sources
+                    # ("ngsrc", len(gauss_sources))] # Number of gaussian sources
         else:
             return [("ntime", time_steps),         # Timesteps
                     ("nchan", nchan),              # Channels
                     ("na", na),                    # Antenna
                     ("nbl", na*(na-1)/2),          # Baselines
-                    ("npsrc", len(lm_coords)),     # Number of point sources
+                    ("npsrc", 0),                  # Number of point sources
                     ("ngsrc", len(gauss_sources))] # Number of gaussian sources
 
     def point_lm(self, context):
@@ -122,14 +123,14 @@ class CustomSourceProvider(SourceProvider):
 
 ######################################################################################
 
-    def direction_independent_effects(self, context):
-        # (ntime, na, nchan, npol)
-        extents = context.dim_extents('ntime', 'na', 'nchan', 'npol')
-        (lt, ut), (la, ua), (lc, uc), (lp, up) = extents
-
-        bp = np.ones((time_steps, 1, 1, 1))
-        bp = bandpass*bp
-        return bp[lt:ut, la:ua, lc:uc, lp:up]
+    # def direction_independent_effects(self, context):
+    #     # (ntime, na, nchan, npol)
+    #     extents = context.dim_extents('ntime', 'na', 'nchan', 'npol')
+    #     (lt, ut), (la, ua), (lc, uc), (lp, up) = extents
+    #
+    #     bp = np.ones((time_steps, 1, 1, 1))
+    #     bp = bandpass*bp
+    #     return bp[lt:ut, la:ua, lc:uc, lp:up]
 
     def uvw(self, context):
         """ Supply UVW antenna coordinates to montblanc """
@@ -175,14 +176,14 @@ class CustomSinkProvider(SinkProvider):
         extents = context.array_extents(context.name)
         (lt, ut), (lbl, ubl), (lc, uc), (lp, up) = extents
         global vis
-        noise = context.data/20
+        # noise = context.data/20
         context_shape = (ut-lt, ubl-lbl, uc-lc, up-lp)
-        complex_noise = np.random.randn(*context_shape) * noise + \
-                        np.random.randn(*context_shape) * noise * 1j
+        # complex_noise = np.random.randn(*context_shape) * noise + \
+                        # np.random.randn(*context_shape) * noise * 1j
         if j==0:
-            vis[i, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise
+            vis[i, lbl:ubl, lc:uc, lp:up] = context.data# + complex_noise
         else:
-            vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise
+            vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data# + complex_noise
 
         return vis
 
@@ -202,7 +203,7 @@ def call_solver():
 
         # Create Customer Source and Sink Providers
         source_provs = [CustomSourceProvider(),
-                        FitsBeamSourceProvider(FITSfiles)
+                        # FitsBeamSourceProvider(FITSfiles)
                        ]
         sink_provs = [CustomSinkProvider()]
 
@@ -248,6 +249,8 @@ for i in range(nant):
         A2[k] = j
         k += 1
 
+# A1, A2 = np.triu_indices(nant, 0)
+
 # Get astronomical sources
 
 gauss_sources = inview([target_ra, target_dec], radius=10, min_flux=0.5)
@@ -258,10 +261,11 @@ lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
 time_steps, n_sats = lm.shape[:2]
 
 astro_lm = np.array([
-                    [0.0, 0.0],
+                    [0.80, 0.0],
                     # [0.1, 0.0]
                     ])[None,:,:]*np.ones((time_steps, 1, 1))
 
+# all_lm = lm
 all_lm = np.concatenate((astro_lm, lm), axis=1)
 
 # Create frequency spectrum array
@@ -279,6 +283,7 @@ wrapped_spectra = wrapped_spectra.reshape(-1, channels)
 sat_spectrum = wrapped_spectra[:n_sats]
 sat_spectrum *= (1e5*np.random.rand(n_sats)+1e4)[:,None]
 
+# full_spectrogram = np.zeros((n_sats, 1, nchan, 1))
 full_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
 
 #### Create rough RFI frequency probability distribution #######################
@@ -296,12 +301,14 @@ rfi_p = rfi_p[perm]
 freq_i = rfi_p[:n_sats]
 freq_f = freq_i + channels
 for i in range(n_sats):
+    # full_spectrogram[i, 0, freq_i[i]:freq_f[i], 0] = sat_spectrum[i]
     full_spectrogram[n_srcs+i, 0, freq_i[i]:freq_f[i], 0] = sat_spectrum[i]
 #### To be changed to accomodate arbitrary astronomical sources ################
 
-freqs = np.linspace(800, 1800, 4096)
-source_spec = (freqs[-1]/freqs)**0.667
-full_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
+# freqs = np.linspace(800, 1800, 4096)
+# source_spec = (freqs[-1]/freqs)**0.667
+# full_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
+full_spectrogram[0,:,:,0] = 0.00
 
 ################################################################################
 
@@ -338,6 +345,7 @@ stokes_srcs = np.array([
                         # [1.0, 0.0, 0.0, 0.0]
                         ])
 
+# lm_stokes = lm_stokes_sats
 lm_stokes = np.concatenate((stokes_srcs, lm_stokes_sats), axis=0)
 
 # Save input spectra
@@ -371,9 +379,9 @@ for j in range(2):
                           dtype=np.complex128)
 
     if j==1:
-        spectra = spectra[:n_srcs]
-        lm_stokes = lm_stokes[:n_srcs]
-        lm_coords = all_lm[0, :n_srcs, :]
+        # spectra = spectra[:n_srcs]
+        # lm_stokes = lm_stokes[:n_srcs]
+        # lm_coords = all_lm[0, :n_srcs, :]
         call_solver()
     else:
         for i in range(len(lm)):
