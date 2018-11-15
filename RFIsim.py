@@ -224,7 +224,7 @@ na = 64
 target_ra = 21.4439
 target_dec = -30.713199999999997
 # target_ra, target_dec = 0., 0.
-tracking_hours = 0.1
+tracking_hours = 48./3600
 integration_secs = 8
 obs_date = '2018/11/07'
 
@@ -250,7 +250,7 @@ for i in range(nant):
 
 # Get astronomical sources
 
-gauss_sources = inview([target_ra, target_dec], radius=10, min_flux=0.1)
+gauss_sources = inview([target_ra, target_dec], radius=10, min_flux=0.5)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats, 2) ######
 lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours,

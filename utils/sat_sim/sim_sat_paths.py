@@ -25,8 +25,7 @@ def radec_to_lm(ra, dec, phase_centre):
     (l,m) : tuple
         l and m coordinates. The direction cosines.
     """
-    ra = np.deg2rad(ra)
-    dec = np.deg2rad(dec)
+    ra, dec = np.deg2rad([ra, dec])
     phase_centre = np.deg2rad(phase_centre)
 
     delta_ra = ra - phase_centre[0]
@@ -111,7 +110,8 @@ def get_lm_and_alt(args):
     for i, sat in enumerate(sats):
         sat = ephem.readtle(*sat)
         sat.compute(obs)
-        l, m = radec_to_lm(sat.ra, sat.dec, phase_centre)
+        ra, dec = np.rad2deg([sat.ra, sat.dec])
+        l, m = radec_to_lm(ra, dec, phase_centre)
         lmalt[i] = l, m, sat.alt
 
     return lmalt
