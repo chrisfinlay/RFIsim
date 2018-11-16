@@ -21,7 +21,7 @@ class RFISourceProvider(SourceProvider):
             ...
     """
     def __init__(self, rfi_run, n_time, n_chan, n_ant, bandpass, gauss_sources,
-                 p_spectrum, rfi_lm, phase_centre, time_step, A1, A2, UVW):
+                 rfi_spectra, rfi_lm, phase_centre, time_step, A1, A2, UVW):
         self.rfi_run = rfi_run
         self.n_time = int(n_time)
         self.n_chan = n_chan
@@ -31,9 +31,9 @@ class RFISourceProvider(SourceProvider):
         self.bandpass = bandpass
         self.gauss_sources = gauss_sources
         self.n_gsrcs = len(gauss_sources)
-        self.p_spectrum = p_spectrum
-        self.n_rfi = p_spectrum.shape[0]
-        self.rfi_lm = rfi_lm
+        self.rfi_spectra = rfi_spectra
+        self.n_rfi = rfi_spectra.shape[0]
+        self.rfi_lm = rfi_lm[time_step]
         self.target = phase_centre
         self.time_step = time_step
         self.A1 = A1
@@ -72,7 +72,7 @@ class RFISourceProvider(SourceProvider):
         # (npsrc, ntime, nchan, 4)
 
         spec = np.ones((1, self.n_time, 1, 1))
-        spec = self.p_spectrum*spec
+        spec = self.rfi_spectra*spec
 
         return spec[lp:up, lt:ut, lc:uc, :]
 
