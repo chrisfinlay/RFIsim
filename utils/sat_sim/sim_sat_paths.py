@@ -147,17 +147,15 @@ def get_visible_sats(lm_alt, radius=30):
 
     return lm_alt_vis[:,:,:2]
 
-def get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
+def get_lm_tracks(phase_centre, transit, tracking_hours,
                   integration_secs=8):
     """
     Get the l,m tracks for all visible satellites through time.
 
     Parameters
     ----------
-    target_ra : float
-        Right ascension of the target source in degrees.
-    target_dec : float
-        Declination of the target source in degrees.
+    phase_centre : tuple
+        Right ascension and declination of the target source in degrees.
     transit : str
         Time and date when the source is at its highest point (transit).
         Formatted as '%a %b %d %H:%M:%S %Y'. See http://strftime.org/ .
@@ -172,7 +170,6 @@ def get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
         Array of shape (time_steps, vis_sats, 2) containing the l,m tracks of
         the visible satellites.
     """
-    phase_centre = [target_ra, target_dec]
 
     start_time = datetime.datetime.strptime(transit, '%a %b %d %H:%M:%S %Y') - \
                  datetime.timedelta(seconds=3600*tracking_hours/2)
@@ -192,4 +189,9 @@ def get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
     all_time = np.array(parmap(get_lm_and_alt, arg_list, proc_power=0.8))
     lm = get_visible_sats(all_time)
 
-    return lm
+    # Add background source (Needed due to Montblanc bug)
+    background = np.zeros((time_steps, 1, 2))
+    background[:,0,:] = [0.9, 0.0]
+    all_lm = np.concatenate((background, lm), axis=1)
+
+    return all_lm

@@ -1,4 +1,3 @@
-import h5py
 import numpy as np
 
 import montblanc
@@ -15,11 +14,14 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # Internal imports
 from utils.uv_sim.uvgen import UVCreate
 from utils.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
+from utils.sat_sim.sim_sat_spectra import get_sat_spectra
+from utils.bandpass.bandpass_gains import get_bandpass_and_gains
 from utils.catalogues.get_ast_sources import inview
+from utils.write_to_h5 import save_output, save_input
 
 ######## Source Provider #######################################################
 
-class CustomSourceProvider(SourceProvider):
+class RFISourceProvider(SourceProvider):
     """
     Supplies data to montblanc via data source methods,
     which have the following signature.
@@ -38,16 +40,16 @@ class CustomSourceProvider(SourceProvider):
         if j==0:
             return [("ntime", ntime),              # Timesteps
                     ("nchan", nchan),              # Channels
-                    ("na", na),                    # Antenna
-                    ("nbl", na*(na-1)/2),          # Baselines
+                    ("na", n_ant),                    # Antenna
+                    ("nbl", n_ant*(n_ant-1)/2),          # Baselines
                     ("npsrc", len(lm_coords)),     # Number of point sources
                     ("ngsrc", 0)]                  # Number of gaussian sources
                     # ("ngsrc", len(gauss_sources))] # Number of gaussian sources
         else:
             return [("ntime", time_steps),         # Timesteps
                     ("nchan", nchan),              # Channels
-                    ("na", na),                    # Antenna
-                    ("nbl", na*(na-1)/2),          # Baselines
+                    ("na", n_ant),                    # Antenna
+                    ("nbl", n_ant*(n_ant-1)/2),          # Baselines
                     ("npsrc", 0),                  # Number of point sources
                     ("ngsrc", len(gauss_sources))] # Number of gaussian sources
 
@@ -141,7 +143,7 @@ class CustomSourceProvider(SourceProvider):
         if j==0:
             idx = np.arange(i*2016, (i+1)*2016)
             auvw = mbu.antenna_uvw(UVW[idx], A1, A2, np.array([2016,]),
-                                   nr_of_antenna=na)
+                                   nr_of_antenna=n_ant)
         else:
             AA1 = []
             AA2 = []
@@ -150,14 +152,14 @@ class CustomSourceProvider(SourceProvider):
                 AA2 += list(A2)
             AA1 = np.array(AA1)
             AA2 = np.array(AA2)
-            chunks = np.array(UVW.shape[0]/2016*[na*(na-1)/2], dtype=np.int)
-            auvw = mbu.antenna_uvw(UVW, AA1, AA2, chunks, nr_of_antenna=na)
+            chunks = np.array(UVW.shape[0]/2016*[n_ant*(n_ant-1)/2], dtype=np.int)
+            auvw = mbu.antenna_uvw(UVW, AA1, AA2, chunks, nr_of_antenna=n_ant)
 
         return auvw[lt:ut, la:ua, l:u]
 
 ######### Sink Provider ########################################################
 
-class CustomSinkProvider(SinkProvider):
+class RFISinkProvider(SinkProvider):
     """
     Receives data from montblanc via data sink methods,
     which have the following signature
@@ -201,11 +203,13 @@ def call_solver():
     # Create montblanc solver
     with montblanc.rime_solver(slvr_cfg) as slvr:
 
-        # Create Customer Source and Sink Providers
-        source_provs = [CustomSourceProvider(),
+        FITSfiles = 'utils/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
+
+        # Create RFI Source and Sink Providers
+        source_provs = [RFISourceProvider(),
                         # FitsBeamSourceProvider(FITSfiles)
                        ]
-        sink_provs = [CustomSinkProvider()]
+        sink_provs = [RFISinkProvider()]
 
         # Call solver, supplying source and sink providers
         slvr.solve(source_providers=source_provs,
@@ -218,12 +222,13 @@ start = tme.time()
 
 ntime = 1
 nchan = 4096
-na = 64
+n_ant = 64
 
 # Define target, track length and integration time
 
 target_ra = 21.4439
 target_dec = -30.713199999999997
+phase_centre = [target_ra, target_dec]
 # target_ra, target_dec = 0., 0.
 tracking_hours = 48./3600
 integration_secs = 8
@@ -237,135 +242,36 @@ uv = UVCreate(antennas='utils/uv_sim/MeerKAT.enu.txt', direction=direction,
 ha = -tracking_hours/2, tracking_hours/2
 transit, UVW = uv.itrf2uvw(h0=ha, dtime=integration_secs/3600., date=obs_date)
 
-# Get antenna baseline pairings
+#### Get antenna baseline pairings #############################################
 
-nant = 64
-A1 = np.empty(nant*(nant-1)/2, dtype=np.int32)
-A2 = np.empty(nant*(nant-1)/2, dtype=np.int32)
-k = 0
-for i in range(nant):
-    for j in range(i+1,nant):
-        A1[k] = i
-        A2[k] = j
-        k += 1
+A1, A2 = np.triu_indices(n_ant, 1)
 
-# A1, A2 = np.triu_indices(nant, 0)
+##### Get astronomical sources #################################################
 
-# Get astronomical sources
+gauss_sources = inview(phase_centre, radius=10, min_flux=0.5)
 
-gauss_sources = inview([target_ra, target_dec], radius=10, min_flux=0.5)
-
-#### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats, 2) ######
-lm = get_lm_tracks(target_ra, target_dec, transit, tracking_hours,
+#### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
+lm = get_lm_tracks(phase_centre, transit, tracking_hours,
                    integration_secs)
 time_steps, n_sats = lm.shape[:2]
 
-astro_lm = np.array([
-                    [0.80, 0.0],
-                    # [0.1, 0.0]
-                    ])[None,:,:]*np.ones((time_steps, 1, 1))
+###### Get satellite spectra ###################################################
 
-# all_lm = lm
-all_lm = np.concatenate((astro_lm, lm), axis=1)
+spectra = get_sat_spectra(n_chan=nchan, n_sats=n_sats, n_time=time_steps)
 
-# Create frequency spectrum array
-np.random.seed(123)
+###### Get bandpass ############################################################
 
-spectra = np.load('utils/sat_sim/sat_spectra/Satellite_Frequency_Spectra.npy')
-perm = np.random.permutation(len(spectra))
-spectra[perm] = spectra
+bandpass, auto_gains, cross_gains = get_bandpass_and_gains()
 
-n_spectra, channels = spectra.shape
-n_srcs = 1
-wraps = n_sats/n_spectra+1
-wrapped_spectra = np.array([spectra for i in range(wraps)])
-wrapped_spectra = wrapped_spectra.reshape(-1, channels)
-sat_spectrum = wrapped_spectra[:n_sats]
-sat_spectrum *= (1e5*np.random.rand(n_sats)+1e4)[:,None]
-
-# full_spectrogram = np.zeros((n_sats, 1, nchan, 1))
-full_spectrogram = np.zeros((n_sats+n_srcs, 1, nchan, 1))
-
-#### Create rough RFI frequency probability distribution #######################
-
-samples = np.random.randint(0, nchan-channels, size=(int(1e6)))
-rfi_p = np.concatenate((samples[(samples>330) & (samples<400)],
-                      samples[(samples>1040) & (samples<1050)],
-                      samples[(samples>1320) & (samples<2020)],
-                      samples[(samples>3120) & (samples<3520)]))
-rfi_p = np.concatenate((rfi_p, np.random.randint(0, nchan-channels,
-                                                 size=len(rfi_p))))
-perm = np.random.permutation(len(rfi_p))
-rfi_p = rfi_p[perm]
-
-freq_i = rfi_p[:n_sats]
-freq_f = freq_i + channels
-for i in range(n_sats):
-    # full_spectrogram[i, 0, freq_i[i]:freq_f[i], 0] = sat_spectrum[i]
-    full_spectrogram[n_srcs+i, 0, freq_i[i]:freq_f[i], 0] = sat_spectrum[i]
-#### To be changed to accomodate arbitrary astronomical sources ################
-
-# freqs = np.linspace(800, 1800, 4096)
-# source_spec = (freqs[-1]/freqs)**0.667
-# full_spectrogram[0,:,:,0] = 2*np.ones((1, 1))*source_spec[None,:]
-full_spectrogram[0,:,:,0] = 0.00
-
-################################################################################
-
-bandpass_file = 'utils/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy'
-bandpass = np.load(bandpass_file).astype(np.complex128)
-FITSfiles = 'utils/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
-
-# Set file name to save data to
+###### Save input data #########################################################
 
 save_file = 'ra=' + str(target_ra) + '_dec=' + str(target_dec) + \
             '_int_secs=' + str(integration_secs) + \
             '_track-time=' + str(round(tracking_hours, 1)) + \
-            'hrs_nants=' + str(nant) + '_nchan=' + str(nchan) + '.h5'
+            'hrs_nants=' + str(n_ant) + '_nchan=' + str(nchan) + '.h5'
 
-
-# Need to change the number of sources variably
-with h5py.File(save_file, 'a') as fp:
-    fp['/input/lm'] = all_lm
-    fp['/input/UVW'] = UVW
-    fp['/input/A1'] = A1
-    fp['/input/A2'] = A2
-    fp['/input/bandpass'] = bandpass
-
-# Stokes parameters (I, Q, U, V)
-stokes_sats = np.random.randint(1, 4, size=n_sats)
-signs = (-1)**np.random.randint(0, 2, size=n_sats)
-lm_stokes_sats = np.zeros((n_sats, 4))
-lm_stokes_sats[:, 0] = 1.0
-for i in range(n_sats):
-    lm_stokes_sats[i, stokes_sats[i]] = signs[i]
-
-stokes_srcs = np.array([
-                        [1.0, 0.0, 0.0, 0.0],
-                        # [1.0, 0.0, 0.0, 0.0]
-                        ])
-
-# lm_stokes = lm_stokes_sats
-lm_stokes = np.concatenate((stokes_srcs, lm_stokes_sats), axis=0)
-
-# Save input spectra
-s = np.asarray(lm_stokes, dtype=np.float64)[:,None,None,:]
-spectra = s*full_spectrogram
-
-with h5py.File(save_file, 'a') as fp:
-    fp['/input/spectra'] = spectra
-
-# Save input bandpasses
-np.random.seed(123)
-antenna_gains_auto = 200*np.random.rand(na) + 50
-antenna_gains_cross = 70*np.random.rand(na) + 10
-
-bandpass[:,:,:,[0,3]] *= antenna_gains_auto[None, :, None, None]
-bandpass[:,:,:,[1,2]] *= antenna_gains_cross[None, :, None, None]
-
-with h5py.File(save_file, 'a') as fp:
-    fp['/input/auto_pol_gains'] = antenna_gains_auto
-    fp['/input/cross_pol_gains'] = antenna_gains_cross
+save_input(save_file, phase_centre, lm, UVW, A1, A2, spectra, bandpass,
+           auto_gains, cross_gains)
 
 # Run simulation twice - once with RFI and once without
 run_start = []
@@ -375,27 +281,17 @@ for j in range(2):
     run_start.append(tme.time())
     print('\n\nInitialization time : {} s\n\n'.format(run_start[j]-start))
 
-    vis = np.zeros(shape=(len(lm), na*(na-1)/2, nchan, 4),
+    vis = np.zeros(shape=(len(lm), n_ant*(n_ant-1)/2, nchan, 4),
                           dtype=np.complex128)
 
     if j==1:
-        # spectra = spectra[:n_srcs]
-        # lm_stokes = lm_stokes[:n_srcs]
-        # lm_coords = all_lm[0, :n_srcs, :]
         call_solver()
     else:
         for i in range(len(lm)):
-            # LM coordinates
-            lm_coords = all_lm[i]
+            lm_coords = lm[i]
             call_solver()
 
     # Save output
-    if j==0:
-        with h5py.File(save_file, 'a') as fp:
-            fp['/output/vis_dirty'] = vis
-
-    else:
-        with h5py.File(save_file, 'a') as fp:
-            fp['/output/vis_clean'] = vis
+    save_output(save_file, vis, clean=j)
 
     print('\n\nCompletion time : {} s\n\n'.format(tme.time()-start))
