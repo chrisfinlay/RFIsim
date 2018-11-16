@@ -76,8 +76,6 @@ class RFISourceProvider(SourceProvider):
 
         return spec[lp:up, lt:ut, lc:uc, :]
 
-######## New ############################################################################
-
     def gaussian_lm(self, context):
         """ Returns an lm coordinate array to Montblanc. """
 
@@ -103,7 +101,6 @@ class RFISourceProvider(SourceProvider):
         emin = np.deg2rad(self.gauss_sources['MinAxis'].values)
         pa = np.deg2rad(self.gauss_sources['PA'].values)
 
-        # gauss = np.empty(context.shape, dtype=context.dtype)
         gauss = np.empty((3, self.n_gsrcs), context.dtype)
 
         gauss[0,:] = emaj * np.sin(pa)
@@ -120,7 +117,6 @@ class RFISourceProvider(SourceProvider):
         extents = context.dim_extents('ngsrc', 'ntime', 'nchan')
         (lg, ug), (lt, ut), (lc, uc) = extents
 
-        # stokes = np.empty(context.shape, context.dtype)
         stokes = np.zeros((self.n_gsrcs, self.n_time, self.n_chan, 4),
                            context.dtype)
 
@@ -129,16 +125,14 @@ class RFISourceProvider(SourceProvider):
 
         return stokes[lg:ug, lt:ut, lc:uc, :]
 
-######################################################################################
+    def direction_independent_effects(self, context):
+        # (ntime, na, nchan, npol)
+        extents = context.dim_extents('ntime', 'na', 'nchan', 'npol')
+        (lt, ut), (la, ua), (lc, uc), (lp, up) = extents
 
-    # def direction_independent_effects(self, context):
-    #     # (ntime, na, nchan, npol)
-    #     extents = context.dim_extents('ntime', 'na', 'nchan', 'npol')
-    #     (lt, ut), (la, ua), (lc, uc), (lp, up) = extents
-    #
-    #     bp = np.ones((self.n_time, 1, 1, 1))
-    #     bp = bandpass*bp
-    #     return bp[lt:ut, la:ua, lc:uc, lp:up]
+        bp = np.ones((self.n_time, 1, 1, 1))
+        bp = self.bandpass*bp
+        return bp[lt:ut, la:ua, lc:uc, lp:up]
 
     def uvw(self, context):
         """ Supply UVW antenna coordinates to montblanc """
@@ -186,11 +180,13 @@ class RFISinkProvider(SinkProvider):
         """ Receive model visibilities from Montblanc in `context.data` """
         extents = context.array_extents(context.name)
         (lt, ut), (lbl, ubl), (lc, uc), (lp, up) = extents
-        # noise = context.data/20
-        # complex_noise = np.random.randn(*context.shape) * noise + \
-                        # np.random.randn(*context.shape) * noise * 1j
+        context_shape = context.data.shape
+
+        noise = context.data/20
+        complex_noise = np.random.randn(*context_shape) * noise + \
+                        np.random.randn(*context_shape) * noise * 1j
         if self.rfi_run:
             i = self.time_step
-            self.vis[i, lbl:ubl, lc:uc, lp:up] = context.data# + complex_noise
+            self.vis[i, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise
         else:
-            self.vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data# + complex_noise
+            self.vis[lt:ut, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise

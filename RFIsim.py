@@ -40,8 +40,8 @@ def call_solver(rfi_run, time_step):
                                   bandpass, gauss_sources, rfi_spectra,
                                   rfi_lm, phase_centre, time_step, A1, A2, UVW)
         # Create RFI Source and Sink Providers
-        source_provs = [source
-                        # FitsBeamSourceProvider(FITSfiles)
+        source_provs = [source,
+                        FitsBeamSourceProvider(FITSfiles)
                        ]
         sink_provs = [RFISinkProvider(vis, rfi_run, time_step)]
 
