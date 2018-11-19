@@ -1,8 +1,8 @@
 import numpy as np
 
-def get_bandpass_and_gains(file_path='utils/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy'):
+def get_bandpass_and_gains():
 
-    bandpass_file = file_path
+    bandpass_file = 'utils/telescope/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy'
     # Shape is (1, n_ant, n_chan, 4)
     bandpass = np.load(bandpass_file).astype(np.complex128)
 

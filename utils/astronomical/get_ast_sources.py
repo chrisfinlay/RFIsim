@@ -23,7 +23,7 @@ def inview(phase_centre, radius, min_flux):
         flux (Jy), major axis (deg), minor axis (deg) and position angle (deg)
         of radio sources fitting the given criteria.
     """
-    df = pd.read_csv('utils/catalogues/SUMSS_NVSS_Clean.csv')
+    df = pd.read_csv('utils/astronomical/catalogues/SUMSS_NVSS_Clean.csv')
     r = np.sqrt((df['RA']-phase_centre[0])**2 + (df['DEC']-phase_centre[1])**2)
     df = df[(r<radius) & (df['Flux']>min_flux)]
 
@@ -48,7 +48,7 @@ def find_closest(ra, dec, min_flux):
     new_target : tuple
         The RA and DEC of the closest source with flux greater than 'min_flux'.
     """
-    df = pd.read_csv('utils/catalogues/SUMSS_NVSS_Clean.csv')
+    df = pd.read_csv('utils/astronomical/catalogues/SUMSS_NVSS_Clean.csv')
     df = df[df['Flux']>min_flux]
     r = np.sqrt((df['RA']-ra)**2 + (df['DEC']-dec)**2)
     df = df[r==np.min(r)]

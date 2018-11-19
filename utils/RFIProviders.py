@@ -6,7 +6,7 @@ from montblanc.impl.rime.tensorflow.sinks import SinkProvider
 import montblanc.util as mbu
 
 
-from utils.sat_sim.sim_sat_paths import radec_to_lm
+from utils.rfi.sat_sim.sim_sat_paths import radec_to_lm
 
 ######## Source Provider #######################################################
 

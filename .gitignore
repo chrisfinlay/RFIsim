@@ -1,8 +1,8 @@
 output_data/
 notebooks/
-utils/beam_sim/beams/
-utils/catalogues/originals/
-utils/sat_sim/sat_spectra/spectra_images/
+utils/telescope/beam_sim/beams/
+utils/astronomical/catalogues/originals/
+utils/rfi/sat_sim/sat_spectra/spectra_images/
 montblanc.log*
 *.pyc
 *.lsm

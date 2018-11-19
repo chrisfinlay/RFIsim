@@ -4,8 +4,8 @@ import numpy as np
 from glob import glob
 from pyrap.measures import measures
 import sys
-sys.path.insert(0, '../..')
-from utils.parallelize import parmap
+sys.path.insert(0, '../../..')
+from utils.helper.parallelize import parmap
 
 def radec_to_lm(ra, dec, phase_centre):
     """
@@ -36,7 +36,7 @@ def radec_to_lm(ra, dec, phase_centre):
 
     return l, m
 
-def read_tles(tle_dir='utils/sat_sim/TLEs/'):
+def read_tles(tle_dir='utils/rfi/sat_sim/TLEs/'):
     """
     Convert TLE text files in a given directory to a list of TLEs.
 

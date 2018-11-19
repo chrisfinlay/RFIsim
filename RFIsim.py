@@ -13,12 +13,12 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Internal imports
 from utils.RFIProviders import RFISourceProvider, RFISinkProvider
-from utils.uv_sim.uvgen import UVCreate
-from utils.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
-from utils.sat_sim.sim_sat_spectra import get_sat_spectra
-from utils.bandpass.bandpass_gains import get_bandpass_and_gains
-from utils.catalogues.get_ast_sources import inview, find_closest
-from utils.write_to_h5 import save_output, save_input
+from utils.helper.write_to_h5 import save_output, save_input
+from utils.telescope.uv_sim.uvgen import UVCreate
+from utils.telescope.bandpass.bandpass_gains import get_bandpass_and_gains
+from utils.rfi.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
+from utils.rfi.sat_sim.sim_sat_spectra import get_sat_spectra
+from utils.astronomical.get_ast_sources import inview, find_closest
 
 ########## Configuration #######################################################
 
@@ -34,7 +34,7 @@ def call_solver(rfi_run, time_step):
     # Create montblanc solver
     with montblanc.rime_solver(slvr_cfg) as slvr:
 
-        FITSfiles = 'utils/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
+        FITSfiles = 'utils/telescope/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
 
         source = RFISourceProvider(rfi_run, n_time, n_chan, n_ant,
                                   bandpass, gauss_sources, rfi_spectra,
@@ -75,7 +75,7 @@ target_dec = -30.713199999999997
 target_ra, target_dec = find_closest(target_ra, target_dec, min_flux)
 phase_centre = [target_ra, target_dec]
 direction = 'J2000,'+str(target_ra)+'deg,'+str(target_dec)+'deg'
-uv = UVCreate(antennas='utils/uv_sim/MeerKAT.enu.txt', direction=direction,
+uv = UVCreate(antennas='utils/telescope/uv_sim/MeerKAT.enu.txt', direction=direction,
               tel='meerkat', coord_sys='enu')
 ha = -tracking_hours/2, tracking_hours/2
 transit, UVW = uv.itrf2uvw(h0=ha, dtime=integration_secs/3600., date=obs_date)

@@ -39,7 +39,8 @@ def sat_stokes(n_sats):
 
 def get_sat_spectra(n_chan, n_sats, n_time):
 
-    spectra = np.load('utils/sat_sim/sat_spectra/Satellite_Frequency_Spectra.npy')
+    file_path = 'utils/rfi/sat_sim/sat_spectra/Satellite_Frequency_Spectra.npy'
+    spectra = np.load(file_path)
     perm = np.random.permutation(len(spectra))
     spectra[perm] = spectra
 
