@@ -12,12 +12,12 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Internal imports
-from RFIProviders import RFISourceProvider, RFISinkProvider
+from utils.RFIProviders import RFISourceProvider, RFISinkProvider
 from utils.uv_sim.uvgen import UVCreate
 from utils.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
 from utils.sat_sim.sim_sat_spectra import get_sat_spectra
 from utils.bandpass.bandpass_gains import get_bandpass_and_gains
-from utils.catalogues.get_ast_sources import inview
+from utils.catalogues.get_ast_sources import inview, find_closest
 from utils.write_to_h5 import save_output, save_input
 
 ########## Configuration #######################################################
@@ -52,23 +52,28 @@ def call_solver(rfi_run, time_step):
 
 ########## Run Simulation ######################################################
 start = tme.time()
-# Set number of channels and antennas
+########## Set number of channels and antennas #################################
 
 n_time = 1
 n_chan = 4096
 n_ant = 64
 
-# Define target, track length and integration time
+min_flux = 0.5      # Jy
+sky_radius = 10     # degrees
 
-target_ra = 21.4439
-target_dec = -30.713199999999997
-phase_centre = [target_ra, target_dec]
-tracking_hours = 48./3600
+######## Define target, track length and integration time ######################
+
+t_steps = 3
+tracking_hours = t_steps*8./3600
 integration_secs = 8
 obs_date = '2018/11/07'
+target_ra = 21.4439
+target_dec = -30.713199999999997
 
-# Create UV tracks
+######## Create UV tracks ######################################################
 
+target_ra, target_dec = find_closest(target_ra, target_dec, min_flux)
+phase_centre = [target_ra, target_dec]
 direction = 'J2000,'+str(target_ra)+'deg,'+str(target_dec)+'deg'
 uv = UVCreate(antennas='utils/uv_sim/MeerKAT.enu.txt', direction=direction,
               tel='meerkat', coord_sys='enu')
@@ -81,7 +86,7 @@ A1, A2 = np.triu_indices(n_ant, 1)
 
 ##### Get astronomical sources #################################################
 
-gauss_sources = inview(phase_centre, radius=10, min_flux=0.5)
+gauss_sources = inview(phase_centre, sky_radius, min_flux)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
 rfi_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
