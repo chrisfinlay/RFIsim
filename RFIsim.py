@@ -17,7 +17,7 @@ from utils.helper.write_to_h5 import save_output, save_input
 from utils.telescope.uv_sim.uvgen import UVCreate
 from utils.telescope.bandpass.bandpass_gains import get_bandpass_and_gains
 from utils.rfi.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
-from utils.rfi.sat_sim.sim_sat_spectra import get_sat_spectra
+from utils.rfi.rfi_spectra.sim_rfi_spectra import get_rfi_spectra
 from utils.rfi.horizon_sim.horizon_sources import get_horizon_lm_tracks
 from utils.astronomical.get_ast_sources import inview, find_closest
 
@@ -90,21 +90,21 @@ A1, A2 = np.triu_indices(n_ant, 1)
 gauss_sources = inview(phase_centre, sky_radius, min_flux)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
-# rfi_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
-#                    integration_secs)
-# time_steps = rfi_lm.shape[0]
-# n_sats = rfi_lm.shape[1]-1
+sat_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
+                   integration_secs)
 
-###### Get horizon rfi sources ######
-rfi_lm = get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
+###### Get horizon rfi sources #################################################
+horizon_lm = get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
                           integration_secs)
+                          
+##### Join RFI source paths ####################################################
+rfi_lm = np.concatenate((sat_lm, horizon_lm), axis=1)
 time_steps = rfi_lm.shape[0]
-n_sats = rfi_lm.shape[1]-1
-
+n_rfi = rfi_lm.shape[1]-1
 
 ###### Get satellite spectra ###################################################
 
-rfi_spectra = get_sat_spectra(n_chan=n_chan, n_sats=n_sats, n_time=time_steps)
+rfi_spectra = get_rfi_spectra(n_chan=n_chan, n_rfi=n_rfi, n_time=time_steps)
 
 ###### Get bandpass ############################################################
 

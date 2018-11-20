@@ -84,10 +84,4 @@ def get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
     # Call parallelization function to get l,m and altitude for all time steps
     all_time = np.array(parmap(get_lm, arg_list, proc_power=0.8))
 
-    # Add background source (Needed due to Montblanc bug)
-    background = np.zeros((time_steps, 1, 2))
-    background[:,0,:] = [0.9, 0.0]
-    all_lm = np.concatenate((background, all_time), axis=1)
-
-
-    return all_lm
+    return all_time
