@@ -1,17 +1,16 @@
+# System imports
 import argparse
 import numpy as np
+import time as tme
+import datetime
+import os
 
+# Montblanc imports
 import montblanc
 from montblanc.impl.rime.tensorflow.sources import SourceProvider
 from montblanc.impl.rime.tensorflow.sources import FitsBeamSourceProvider
 from montblanc.impl.rime.tensorflow.sinks import SinkProvider
 import montblanc.util as mbu
-
-import time as tme
-import datetime
-
-import os
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Internal imports
 from utils.RFIProviders import RFISourceProvider, RFISinkProvider
@@ -52,12 +51,19 @@ def create_parser():
     parser.add_argument("--radius", default=10, type=float,
                         help="""Radius around target in which to include
                         astronomical sources in degrees""")
+    parser.add_argument("--gpu", default=0, type=int,
+                        help="""GPU id e.g 0. If you want to run on the CPU
+                        use -1.""")
 
 
     return parser
 
 args = create_parser().parse_args()
 
+if args.gpu == -1:
+    os.environ["CUDA_VISIBLE_DEVICES"]=""
+else:
+    os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)
 ########## Configuration #######################################################
 
 # Configure montblanc solver with a memory budget of 1.7GB
