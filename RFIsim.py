@@ -18,6 +18,7 @@ from utils.telescope.uv_sim.uvgen import UVCreate
 from utils.telescope.bandpass.bandpass_gains import get_bandpass_and_gains
 from utils.rfi.sat_sim.sim_sat_paths import get_lm_tracks, radec_to_lm
 from utils.rfi.sat_sim.sim_sat_spectra import get_sat_spectra
+from utils.rfi.horizon_sim.horizon_sources import get_horizon_lm_tracks
 from utils.astronomical.get_ast_sources import inview, find_closest
 
 ########## Configuration #######################################################
@@ -75,8 +76,8 @@ target_dec = -30.713199999999997
 target_ra, target_dec = find_closest(target_ra, target_dec, min_flux)
 phase_centre = [target_ra, target_dec]
 direction = 'J2000,'+str(target_ra)+'deg,'+str(target_dec)+'deg'
-uv = UVCreate(antennas='utils/telescope/uv_sim/MeerKAT.enu.txt', direction=direction,
-              tel='meerkat', coord_sys='enu')
+uv = UVCreate(antennas='utils/telescope/uv_sim/MeerKAT.enu.txt',
+              direction=direction, tel='meerkat', coord_sys='enu')
 ha = -tracking_hours/2, tracking_hours/2
 transit, UVW = uv.itrf2uvw(h0=ha, dtime=integration_secs/3600., date=obs_date)
 
@@ -89,10 +90,17 @@ A1, A2 = np.triu_indices(n_ant, 1)
 gauss_sources = inview(phase_centre, sky_radius, min_flux)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
-rfi_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
-                   integration_secs)
+# rfi_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
+#                    integration_secs)
+# time_steps = rfi_lm.shape[0]
+# n_sats = rfi_lm.shape[1]-1
+
+###### Get horizon rfi sources ######
+rfi_lm = get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
+                          integration_secs)
 time_steps = rfi_lm.shape[0]
 n_sats = rfi_lm.shape[1]-1
+
 
 ###### Get satellite spectra ###################################################
 

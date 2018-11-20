@@ -174,13 +174,11 @@ def get_lm_tracks(phase_centre, transit, tracking_hours,
     start_time = datetime.datetime.strptime(transit, '%a %b %d %H:%M:%S %Y') - \
                  datetime.timedelta(seconds=3600*tracking_hours/2)
 
-    ska = set_observer(start_time, telescope='meerkat')
     sats = read_tles()
     time_steps = int(3600*tracking_hours/integration_secs)
 
     # Set up argument list for parallelization
     obs_times = [start_time + datetime.timedelta(seconds=i*8) for i in range(time_steps)]
-    all_obs = [set_observer(obs_times[i]) for i in range(len(obs_times))]
     all_sats = [sats for i in range(len(obs_times))]
     centres = [phase_centre for i in range(len(obs_times))]
     arg_list = [list(i) for i in zip(all_sats, obs_times, centres)]
