@@ -3,7 +3,7 @@ import ephem
 import datetime
 import sys
 sys.path.insert(0, '../../..')
-from utils.rfi.sat_sim.sim_sat_paths import set_observer
+from utils.rfi.sat_sim.sim_sat_paths import radec_to_lm, set_observer
 from utils.helper.parallelize import parmap
 
 locations = {'ska': (-30.712586, 21.442888),
@@ -52,7 +52,7 @@ def get_lm(args):
         ra, dec = np.rad2deg(obs.radec_of(bearing, 0))
         delta_ra = np.abs(ra - phase_centre[0])
         delta_dec = np.abs(dec - phase_centre[1])
-        if delta_ra<60 and delta_dec<60:
+        if delta_ra<90 and delta_dec<90:
             lm[i] = radec_to_lm(ra, dec, phase_centre)
         else:
             lm[i] = -0.7, -0.7
@@ -73,7 +73,7 @@ def get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
     ska = locations['ska']
     towns = ['canarvon', 'vanwyksvlei', 'brandvlei', 'williston']
     bearings = [get_bearing(ska[0], ska[1], *locations[town]) for town in towns]
-
+    # bearings = np.deg2rad(np.arange(360))
 
     # Set up argument list for parallelization
     obs_times = [start_time + datetime.timedelta(seconds=i*8) for i in range(time_steps)]

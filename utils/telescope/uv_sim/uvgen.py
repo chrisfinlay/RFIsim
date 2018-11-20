@@ -43,7 +43,7 @@ def abort(string,exception=None):
 class UVCreate(object):
 
     def __init__(self, antennas, direction, lon=None, lat=None, tel=None,
-                 coord_sys='enu'):
+                 coord_sys='enu', n_ant=False):
         """
         Initialise UVCreate object with observation details.
 
@@ -82,6 +82,7 @@ class UVCreate(object):
 
         self.lat = lat
         self.lon = lon
+        self.n_ant = n_ant
 
 
     def enu2itrf(self, antennas=None, lon=None, lat=None):
@@ -237,7 +238,10 @@ class UVCreate(object):
         coord_sys = coord_sys or self.coord_sys
 
         if isinstance(antennas,str):
-            antennas = numpy.genfromtxt(antennas)[:,:3]
+            if self.n_ant:
+                antennas = numpy.genfromtxt(antennas)[:self.n_ant,:3]
+            else:
+                antennas = numpy.genfromtxt(antennas)[:,:3]
 
         if coord_sys == 'enu':
             antennas = self.enu2itrf(antennas, lon, lat)[1]
