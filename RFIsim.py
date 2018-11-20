@@ -154,10 +154,11 @@ bandpass, auto_gains, cross_gains = get_bandpass_and_gains()
 
 ###### Save input data #########################################################
 
-save_file = 'ra=' + str(round(target_ra, 2)) + '_dec=' + \
-            str(round(target_dec, 2)) + '_int_secs=' + str(integration_secs) + \
-            '_track-time=' + str(round(tracking_hours, 1)) + \
-            'hrs_nants=' + str(n_ant) + '_nchan=' + str(n_chan) + '.h5'
+save_file = 'date=' + str(obs_date) + '_ra=' + str(round(target_ra, 2)) + \
+            '_dec=' + str(round(target_dec, 2)) + '_int_secs=' + \
+            str(integration_secs) + '_track-time=' + \
+            str(round(tracking_hours, 1)) + 'hrs_nants=' + str(n_ant) + \
+            '_nchan=' + str(n_chan) + '.h5'
 
 save_input(save_file, phase_centre, rfi_lm, UVW, A1, A2, rfi_spectra, bandpass,
            auto_gains, cross_gains)
@@ -178,7 +179,6 @@ for j in range(2):
     else:
         n_time = 1
         for i in range(len(rfi_lm)):
-        # for i in range(10):
             call_solver(rfi_run=True, time_step=i)
 
     # Save output
