@@ -51,6 +51,8 @@ def create_parser():
     parser.add_argument("--radius", default=10, type=float,
                         help="""Radius around target in which to include
                         astronomical sources in degrees""")
+    parser.add_argument("--noise", default=10, type=float,
+                        help="Absolute noise level in the visibilities.")
     parser.add_argument("--gpu", default=0, type=int,
                         help="""GPU id e.g 0. If you want to run on the CPU
                         use -1.""")
@@ -87,7 +89,7 @@ def call_solver(rfi_run, time_step):
         source_provs = [source,
                         FitsBeamSourceProvider(FITSfiles)
                        ]
-        sink_provs = [RFISinkProvider(vis, rfi_run, time_step)]
+        sink_provs = [RFISinkProvider(vis, rfi_run, time_step, noise)]
 
         # Call solver, supplying source and sink providers
         slvr.solve(source_providers=source_provs,
@@ -107,6 +109,7 @@ target_dec = args.dec
 obs_date = args.date
 min_flux = args.minflux
 sky_radius = args.radius
+noise = args.noise
 
 ########## Fixed Parameters ####################################################
 

@@ -167,10 +167,11 @@ class RFISinkProvider(SinkProvider):
         def model_vis(self, context):
             print context. data
     """
-    def __init__(self, vis, rfi_run, time_step):
+    def __init__(self, vis, rfi_run, time_step, noise):
         self.vis = vis
         self.rfi_run = rfi_run
         self.time_step = time_step
+        self.noise = noise
 
     def name(self):
         """ Name of the Sink Provider """
@@ -182,9 +183,8 @@ class RFISinkProvider(SinkProvider):
         (lt, ut), (lbl, ubl), (lc, uc), (lp, up) = extents
         context_shape = context.data.shape
 
-        noise = context.data/20
-        complex_noise = np.random.randn(*context_shape) * noise + \
-                        np.random.randn(*context_shape) * noise * 1j
+        complex_noise = np.random.randn(*context_shape) * self.noise + \
+                        np.random.randn(*context_shape) * self.noise * 1j
         if self.rfi_run:
             i = self.time_step
             self.vis[i, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise

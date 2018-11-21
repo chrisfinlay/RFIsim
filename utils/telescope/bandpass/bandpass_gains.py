@@ -8,8 +8,8 @@ def get_bandpass_and_gains():
 
     n_ant = bandpass.shape[0]
 
-    antenna_gains_auto = 200*np.random.rand(n_ant) + 50
-    antenna_gains_cross = 70*np.random.rand(n_ant) + 10
+    antenna_gains_auto = 2*np.random.rand(n_ant) + 0.5
+    antenna_gains_cross = 0.7*np.random.rand(n_ant) + 0.1
 
     bandpass[:,:,:,[0,3]] *= antenna_gains_auto[None, :, None, None]
     bandpass[:,:,:,[1,2]] *= antenna_gains_cross[None, :, None, None]
