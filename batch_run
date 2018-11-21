@@ -1,0 +1,10 @@
+RA=($(seq 0 180 180))
+DEC=($(seq 0 -15 -90))
+
+for i in "${RA[@]}"
+do
+    for j in "${DEC[@]}"
+    do
+         python RFIsim.py --ntime 450 --nant 8 --ra $i --dec $j
+    done
+done
