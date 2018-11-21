@@ -7,7 +7,7 @@ def wrap_spectra(spectra, n_rfi):
     wrapped_spectra = np.array([spectra for i in range(wraps)])
     wrapped_spectra = wrapped_spectra.reshape(-1, channels)
     rfi_spectrum = wrapped_spectra[:n_rfi]
-    rfi_spectrum *= (1e5*np.random.rand(n_rfi)+1e4)[:,None]
+    rfi_spectrum *= (1e7*np.random.rand(n_rfi)+1e6)[:,None]
 
     return rfi_spectrum
 

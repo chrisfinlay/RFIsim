@@ -51,8 +51,10 @@ def create_parser():
     parser.add_argument("--radius", default=10, type=float,
                         help="""Radius around target in which to include
                         astronomical sources in degrees""")
-    parser.add_argument("--noise", default=10, type=float,
+    parser.add_argument("--noise", default=0.05, type=float,
                         help="Absolute noise level in the visibilities.")
+    parser.add_argument("--save_dir", default='.', type=str,
+                        help="Directory to save ouput files.")
     parser.add_argument("--gpu", default=0, type=int,
                         help="""GPU id e.g 0. If you want to run on the CPU
                         use -1.""")
@@ -110,6 +112,7 @@ obs_date = args.date
 min_flux = args.minflux
 sky_radius = args.radius
 noise = args.noise
+save_dir = args.save_dir
 
 ########## Fixed Parameters ####################################################
 
@@ -168,7 +171,8 @@ save_file = 'date=' + str(obs_date) + '_ra=' + str(round(target_ra, 2)) + \
             str(integration_secs) + '_track-time=' + \
             str(round(tracking_hours, 1)) + 'hrs_nants=' + str(n_ant) + \
             '_nchan=' + str(n_chan) + '.h5'
-
+            
+save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, rfi_lm, UVW, A1, A2, rfi_spectra, bandpass,
            auto_gains, cross_gains)
 

@@ -183,8 +183,9 @@ class RFISinkProvider(SinkProvider):
         (lt, ut), (lbl, ubl), (lc, uc), (lp, up) = extents
         context_shape = context.data.shape
 
-        complex_noise = np.random.randn(*context_shape) * self.noise + \
-                        np.random.randn(*context_shape) * self.noise * 1j
+        noise = self.noise*context.data
+        complex_noise = np.random.randn(*context_shape) * noise + \
+                        np.random.randn(*context_shape) * noise * 1j
         if self.rfi_run:
             i = self.time_step
             self.vis[i, lbl:ubl, lc:uc, lp:up] = context.data + complex_noise
