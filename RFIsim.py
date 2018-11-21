@@ -48,10 +48,10 @@ def create_parser():
                         help="Date of the observation. Format YYYY/MM/DD")
     parser.add_argument("--minflux", default=0.5, type=float,
                         help="Minimum flux of astronomical sources in Jy")
-    parser.add_argument("--radius", default=10, type=float,
+    parser.add_argument("--radius", default=20, type=float,
                         help="""Radius around target in which to include
                         astronomical sources in degrees""")
-    parser.add_argument("--noise", default=0.05, type=float,
+    parser.add_argument("--noise", default=0.5, type=float,
                         help="Absolute noise level in the visibilities.")
     parser.add_argument("--save_dir", default='.', type=str,
                         help="Directory to save ouput files.")
@@ -169,12 +169,16 @@ bandpass, auto_gains, cross_gains = get_bandpass_and_gains()
 save_file = 'date=' + str(obs_date) + '_ra=' + str(round(target_ra, 2)) + \
             '_dec=' + str(round(target_dec, 2)) + '_int_secs=' + \
             str(integration_secs) + '_track-time=' + \
-            str(round(tracking_hours, 1)) + 'hrs_nants=' + str(n_ant) + \
-            '_nchan=' + str(n_chan) + '.h5'
-            
+            str(time_steps) + 'hrs_nants=' + str(n_ant) + \
+            '_noise=' + str(round(noise,3)) + '.h5'
+
 save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, rfi_lm, UVW, A1, A2, rfi_spectra, bandpass,
            auto_gains, cross_gains)
+
+with open('montblanc_timings.txt', 'a') as t:
+    t.write(save_file)
+    t.write('\n\nInitialization time : {} s\n'.format(tme.time()-start))
 
 ### Run simulation twice - once with RFI and once without ######################
 run_start = []
@@ -196,6 +200,9 @@ for j in range(2):
 
     # Save output
     save_output(save_file, vis, clean=j)
+    if j==0:
+        with open('montblanc_timings.txt', 'a') as t:
+            t.write('\nDirty Completion time : {} s\n'.format(dirty_time))
 
 dirty_time = round(run_start[1]-run_start[0], 2)
 clean_time = round(tme.time()-run_start[1], 2)
@@ -203,3 +210,7 @@ total_time = round(tme.time()-start, 2)
 print('\n\nDirty Completion time : {} s\n'.format(dirty_time))
 print('\nClean Completion time : {} s\n'.format(clean_time))
 print('\nTotal Completion time : {} s\n\n'.format(total_time))
+
+with open('montblanc_timings.txt', 'a') as t:
+    t.write('\nClean Completion time : {} s\n'.format(clean_time))
+    t.write('\nTotal Completion time : {} s\n\n'.format(total_time))
