@@ -36,6 +36,33 @@ def radec_to_lm(ra, dec, phase_centre):
 
     return l, m
 
+def angular_separation(ra, dec, phase_centre):
+    """
+    Calculates the angular separation between a source and the phase centre.
+
+    Parameters
+    ----------
+    ra : float
+        Right-ascension of the source in degrees.
+    dec : float
+        Declination of the source in degrees.
+    phase_centre : tuple
+        Right-ascension and declination of the phase centre in degrees.
+
+    Returns
+    ------
+    theta : float
+        The angular separation between the phase centre and given source in
+        degrees.
+    """
+    ra1, dec1 = np.deg2rad([ra, dec])
+    ra2, dec2 = np.deg2rad(phase_centre)
+
+    theta = np.arccos(np.sin(dec1)*np.sin(dec2) + \
+            np.cos(dec1)*np.cos(dec2)*np.cos(ra1-ra2))
+
+    return theta
+
 def read_tles(tle_dir='utils/rfi/sat_sim/TLEs/'):
     """
     Convert TLE text files in a given directory to a list of TLEs.
@@ -96,7 +123,8 @@ def get_lm_and_alt(args):
         obs_date : datetime object
             Observation time and date.
         phase_centre : array_like
-            Right ascension and declination of phase centre (pointing centre).
+            Right ascension and declination of phase centre (pointing centre)
+            in degrees.
 
     Returns
     -------
@@ -106,13 +134,14 @@ def get_lm_and_alt(args):
     """
     sats, obs_date, phase_centre = args
     obs = set_observer(obs_date)
-    lmalt = np.zeros((len(sats), 3))
+    lmalt = np.zeros((len(sats), 4))
     for i, sat in enumerate(sats):
         sat = ephem.readtle(*sat)
         sat.compute(obs)
         ra, dec = np.rad2deg([sat.ra, sat.dec])
         l, m = radec_to_lm(ra, dec, phase_centre)
-        lmalt[i] = l, m, sat.alt
+        theta = angular_separation(ra, dec, phase_centre)
+        lmalt[i] = l, m, sat.alt, theta
 
     return lmalt
 
@@ -123,8 +152,9 @@ def get_visible_sats(lm_alt, radius=30):
     Parameters
     ----------
     lm_alt : ndarray
-        Array of shape (time_steps, n_sats, 3). It contains all the l,m
-        coordinates and altitude of every satellite for every time step.
+        Array of shape (time_steps, n_sats, 4). It contains all the l,m
+        coordinates, altitude and angular separation from phase centre of
+        every satellite for every time step.
     radius : float
         Radial field of view in degrees.
 
@@ -135,7 +165,8 @@ def get_visible_sats(lm_alt, radius=30):
         satellite is below the horizon l and m are set to -0.7 (edge l,m plane).
     """
     r = np.sqrt(lm_alt[:,:,0]**2+lm_alt[:,:,1]**2)
-    visible = ((lm_alt[:,:,-1]>0) & (r<np.deg2rad(radius))).astype(int)
+    visible = ((lm_alt[:,:,2]>0) & (r<np.deg2rad(radius)) &
+               (lm_alt[:,:,-1]<90)).astype(int)
 
     # Satellite must be visible for at least 1 time step
     idx_vis = np.where(np.sum(visible, axis=0)>0)[0]
