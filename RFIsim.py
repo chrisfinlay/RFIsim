@@ -49,7 +49,7 @@ def create_parser():
                         help="Date of the observation. Format YYYY/MM/DD")
     parser.add_argument("--minflux", default=0.5, type=float,
                         help="Minimum flux of astronomical sources in Jy")
-    parser.add_argument("--radius", default=20, type=float,
+    parser.add_argument("--radius", default=10, type=float,
                         help="""Radius around target in which to include
                         astronomical sources in degrees""")
     parser.add_argument("--noise", default=0.5, type=float,

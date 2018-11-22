@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+import sys
+sys.path.insert(0, '../..')
+from utils.rfi.sat_sim.sim_sat_paths import angular_separation
 
 
 def inview(phase_centre, radius, min_flux):
@@ -24,8 +27,9 @@ def inview(phase_centre, radius, min_flux):
         of radio sources fitting the given criteria.
     """
     df = pd.read_csv('utils/astronomical/catalogues/SUMSS_NVSS_Clean.csv')
-    r = np.sqrt((df['RA']-phase_centre[0])**2 + (df['DEC']-phase_centre[1])**2)
-    df = df[(r<radius) & (df['Flux']>min_flux)]
+    theta = angular_separation(df['RA'].values, df['DEC'].values, phase_centre)
+    theta = np.rad2deg(theta)
+    df = df[(theta<radius) & (df['Flux']>min_flux)]
 
     return df
 
