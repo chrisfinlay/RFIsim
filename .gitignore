@@ -4,6 +4,7 @@ utils/telescope/beam_sim/beams/
 utils/astronomical/catalogues/originals/
 utils/rfi/rfi_spectra/spectra_images/
 montblanc.log*
+timings.txt
 *.pyc
 *.lsm
 *.csv

@@ -52,6 +52,6 @@ def find_closest(ra, dec, min_flux):
     df = df[df['Flux']>min_flux]
     r = np.sqrt((df['RA']-ra)**2 + (df['DEC']-dec)**2)
     df = df[r==np.min(r)]
-    new_target = df['RA'].values[0], df['DEC'].values[0]
+    new_target = df['RA'].values[0], df['DEC'].values[0], df['Flux'].values[0]
 
     return new_target

@@ -25,7 +25,8 @@ from utils.astronomical.get_ast_sources import inview, find_closest
 ######### Arg Parser ###########################################################
 def valid_date(s):
     try:
-        return datetime.datetime.strptime(s, "%Y/%m/%d")
+        datetime.datetime.strptime(s, "%Y/%m/%d")
+        return s
     except ValueError:
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
@@ -36,12 +37,12 @@ def create_parser():
                         help="Number of timesteps")
     parser.add_argument("--intsecs", default=8, type=int,
                         help="Integration time per time step in seconds"),
-    parser.add_argument("--nant", default=16, type=int,
+    parser.add_argument("--nant", default=4, type=int,
                         help="Number of antenna")
-    parser.add_argument("--ra", default=0.0, type=float,
+    parser.add_argument("--ra", default=295.0, type=float,
                         help="""Right ascension of target direction in
                         decimal degrees""")
-    parser.add_argument("--dec", default=0.0, type=float,
+    parser.add_argument("--dec", default=-63.71, type=float,
                         help="""Declination of target direction in
                         decimal degrees""")
     parser.add_argument("--date", default='2018/11/07', type=valid_date,
@@ -53,6 +54,8 @@ def create_parser():
                         astronomical sources in degrees""")
     parser.add_argument("--noise", default=0.5, type=float,
                         help="Absolute noise level in the visibilities.")
+    parser.add_argument("--nsats", default=20, type=int,
+                        help="Number of satellite RFI sources to consider.")
     parser.add_argument("--save_dir", default='.', type=str,
                         help="Directory to save ouput files.")
     parser.add_argument("--gpu", default=0, type=int,
@@ -112,6 +115,7 @@ obs_date = args.date
 min_flux = args.minflux
 sky_radius = args.radius
 noise = args.noise
+n_sats = args.nsats
 save_dir = args.save_dir
 
 ########## Fixed Parameters ####################################################
@@ -125,7 +129,7 @@ tracking_hours = float(time_steps*integration_secs)/3600
 
 ######## Create UV tracks ######################################################
 
-target_ra, target_dec = find_closest(target_ra, target_dec, min_flux)
+target_ra, target_dec, target_flux = find_closest(target_ra, target_dec, min_flux)
 phase_centre = [target_ra, target_dec]
 print("""\nMoving phase centre to closest astronomical target @ \
          RA:{} , DEC:{}\n""".format(*np.round(phase_centre, 2)))
@@ -146,7 +150,7 @@ gauss_sources = inview(phase_centre, sky_radius, min_flux)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
 sat_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
-                   integration_secs)
+                   integration_secs)[:,:n_sats,:]
 
 ###### Get horizon rfi sources #################################################
 horizon_lm = get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
@@ -154,7 +158,7 @@ horizon_lm = get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
 
 ##### Join RFI source paths ####################################################
 rfi_lm = np.concatenate((sat_lm, horizon_lm), axis=1)
-n_rfi = rfi_lm.shape[1]-1
+n_rfi = rfi_lm.shape[1]
 
 ###### Get satellite spectra ###################################################
 
@@ -162,23 +166,28 @@ rfi_spectra = get_rfi_spectra(n_chan=n_chan, n_rfi=n_rfi, n_time=time_steps)
 
 ###### Get bandpass ############################################################
 
-bandpass, auto_gains, cross_gains = get_bandpass_and_gains()
+bandpass, auto_gains, cross_gains = get_bandpass_and_gains(target_flux)
 
 ###### Save input data #########################################################
 
-save_file = 'date=' + str(obs_date) + '_ra=' + str(round(target_ra, 2)) + \
+date = datetime.datetime.strptime(transit,
+                                  '%a %b %d %H:%M:%S %Y').strftime('%Y-%m-%d')
+
+save_file = 'date=' + str(date) + '_ra=' + str(round(target_ra, 2)) + \
             '_dec=' + str(round(target_dec, 2)) + '_int_secs=' + \
-            str(integration_secs) + '_track-time=' + \
-            str(time_steps) + 'hrs_nants=' + str(n_ant) + \
+            str(integration_secs) + '_timesteps=' + \
+            str(time_steps) + '_nants=' + str(n_ant) + \
             '_noise=' + str(round(noise,3)) + '.h5'
 
 save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, rfi_lm, UVW, A1, A2, rfi_spectra, bandpass,
            auto_gains, cross_gains)
 
-with open('montblanc_timings.txt', 'a') as t:
+with open('timings.txt', 'a') as t:
+    now = str(datetime.datetime.now()+datetime.timedelta(hours=2))
+    t.write('\n-----------------------'+now+'-------------------------\n\n')
     t.write(save_file)
-    t.write('\n\nInitialization time : {} s\n'.format(tme.time()-start))
+    t.write('\n\nInitialization time   : {} s\n'.format(tme.time()-start))
 
 ### Run simulation twice - once with RFI and once without ######################
 run_start = []
@@ -186,7 +195,6 @@ run_start = []
 for j in range(2):
 
     run_start.append(tme.time())
-    print('\n\nInitialization time : {} s\n\n'.format(run_start[j]-start))
 
     vis = np.zeros(shape=(len(rfi_lm), n_bl, n_chan, 4), dtype=np.complex128)
 
@@ -201,16 +209,16 @@ for j in range(2):
     # Save output
     save_output(save_file, vis, clean=j)
     if j==0:
-        with open('montblanc_timings.txt', 'a') as t:
+        dirty_time = round(tme.time()-run_start[0], 2)
+        with open('timings.txt', 'a') as t:
             t.write('\nDirty Completion time : {} s\n'.format(dirty_time))
 
-dirty_time = round(run_start[1]-run_start[0], 2)
 clean_time = round(tme.time()-run_start[1], 2)
 total_time = round(tme.time()-start, 2)
 print('\n\nDirty Completion time : {} s\n'.format(dirty_time))
 print('\nClean Completion time : {} s\n'.format(clean_time))
 print('\nTotal Completion time : {} s\n\n'.format(total_time))
 
-with open('montblanc_timings.txt', 'a') as t:
+with open('timings.txt', 'a') as t:
     t.write('\nClean Completion time : {} s\n'.format(clean_time))
     t.write('\nTotal Completion time : {} s\n\n'.format(total_time))
