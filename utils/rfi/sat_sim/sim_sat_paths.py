@@ -166,7 +166,7 @@ def get_visible_sats(lm_alt, radius=30):
     """
     r = np.sqrt(lm_alt[:,:,0]**2+lm_alt[:,:,1]**2)
     visible = ((lm_alt[:,:,2]>0) & (r<np.deg2rad(radius)) &
-               (lm_alt[:,:,-1]<90)).astype(int)
+               (lm_alt[:,:,-1]<60)).astype(int)
 
     # Satellite must be visible for at least 1 time step
     idx_vis = np.where(np.sum(visible, axis=0)>0)[0]
