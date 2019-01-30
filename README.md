@@ -19,14 +19,36 @@ If you have an Nvidia GPU capable of running TensorFlow code then make sure you 
 To get the docker environment running to use this tool simply run the following command.
 
 ```
-docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-py2-new
+docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-fixed-gpu
 cd /data
 git clone https://github.com/chrisfinlay/RFIsim.git
-cd /data/RFIsim/utils/catalogues
+cd /data/RFIsim/utils/astronomical/catalogues
 unzip SUMSS_NVSS_Clean.csv.zip
+cd /data/RFIsim/utils/telescope/beam_sim
+mkdir beams
+python create_beam.py
 cd /data/RFIsim
-python utils/beam_sim/create_beam.py
 python RFIsim.py
+```
+
+### Output Data
+
+#### Structure
+```
+/
+|--- input
+|       |--- target                (RA, DEC)
+|       |--- lm                    (time_steps, n_srcs, {l,m})
+|       |--- UVW                   (time_steps*n_bl, {u,v,w})
+|       |--- A1                    (n_bl)
+|       |--- A2                    (n_bl)
+|       |--- spectra               (n_srcs, time_steps, freq_chans, n_pols)
+|       |--- bandpass              (1, n_ants, freq_chans, n_pols)
+|       |--- auto_pol_gains        (1)
+|       |--- cross_pol_gains       (1)
+|--- output
+        |--- vis_clean             (time_steps, n_bl, freq_chans, n_pols)
+        |--- vis_dirty             (time_steps, n_bl, freq_chans, n_pols)
 ```
 
 ## Built With
