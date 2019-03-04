@@ -1,4 +1,5 @@
 import datetime
+import time as tme
 import ephem
 import numpy as np
 from glob import glob
@@ -218,4 +219,6 @@ def get_lm_tracks(phase_centre, transit, tracking_hours,
     all_time = np.array(parmap(get_lm_and_alt, arg_list, proc_power=0.8))
     lm = get_visible_sats(all_time)
 
-    return lm
+    obs_times = np.array([tme.mktime(x.timetuple()) for x in obs_times])
+
+    return lm, obs_times

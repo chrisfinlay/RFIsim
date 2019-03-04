@@ -58,7 +58,7 @@ def create_parser():
                         help="Number of satellite RFI sources to consider.")
     parser.add_argument("--save_dir", default='.', type=str,
                         help="Directory to save ouput files.")
-    parser.add_argument("--gpu", default=0, type=int,
+    parser.add_argument("--gpu", default=-1, type=int,
                         help="""GPU id e.g 0. If you want to run on the CPU
                         use -1.""")
 
@@ -149,8 +149,11 @@ A1, A2 = np.triu_indices(n_ant, 1)
 gauss_sources = inview(phase_centre, sky_radius, min_flux)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
-sat_lm = get_lm_tracks(phase_centre, transit, tracking_hours,
-                   integration_secs)[:,:n_sats,:]
+sat_lm, obs_times = get_lm_tracks(phase_centre, transit, tracking_hours,
+                                  integration_secs)
+
+sat_lm = sat_lm[:,:n_sats,:]
+
 
 ###### Get horizon rfi sources #################################################
 horizon_lm = get_horizon_lm_tracks(phase_centre, transit, tracking_hours,
@@ -166,7 +169,8 @@ rfi_spectra = get_rfi_spectra(n_chan=n_chan, n_rfi=n_rfi, n_time=time_steps)
 
 ###### Get bandpass ############################################################
 
-bandpass, auto_gains, cross_gains = get_bandpass_and_gains(target_flux)
+bandpass, auto_gains, cross_gains = get_bandpass_and_gains(target_flux,
+                                                           obs_times)
 
 ###### Save input data #########################################################
 
