@@ -45,7 +45,8 @@ python RFIsim.py
 |       |--- A1                    (n_bl)
 |       |--- A2                    (n_bl)
 |       |--- spectra               (n_srcs, time_steps, freq_chans, n_pols)
-|       |--- bandpass              (1, n_ants, freq_chans, n_pols)
+|       |--- bandpass              (time_steps, n_ants, freq_chans, n_pols)
+|       |--- frequencies           (freq_chans)
 |       |--- auto_pol_gains        (1)
 |       |--- cross_pol_gains       (1)
 |--- output

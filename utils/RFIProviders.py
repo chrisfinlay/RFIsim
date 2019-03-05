@@ -20,13 +20,15 @@ class RFISourceProvider(SourceProvider):
         def point_lm(self, context)
             ...
     """
-    def __init__(self, rfi_run, n_time, n_chan, n_ant, bandpass, gauss_sources,
-                 rfi_spectra, rfi_lm, phase_centre, time_step, A1, A2, UVW):
+    def __init__(self, rfi_run, n_time, n_chan, n_ant, freqs, bandpass,
+                 gauss_sources, rfi_spectra, rfi_lm, phase_centre, time_step,
+                 A1, A2, UVW):
         self.rfi_run = rfi_run
         self.n_time = int(n_time)
         self.n_chan = n_chan
         self.n_ant = n_ant
         self.n_bl = n_ant*(n_ant-1)/2
+        self.freqs = freqs
         self.UVW = UVW
         self.bandpass = bandpass
         self.gauss_sources = gauss_sources
@@ -57,6 +59,13 @@ class RFISourceProvider(SourceProvider):
             dims.append(("npsrc", 0))
 
         return dims
+
+    def frequency(self, context):
+        """ Supply frequencies for each channel """
+        # Shape (nchan)
+        lc, uc = context.array_extents(context.name)[0]
+
+        return self.freqs[lc:uc]
 
     def point_lm(self, context):
         """ Supply point source lm coordinates to montblanc """

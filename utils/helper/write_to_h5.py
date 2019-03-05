@@ -1,6 +1,6 @@
 import h5py
 
-def save_input(save_file, target, lm, UVW, A1, A2, spectra, bandpass,
+def save_input(save_file, target, lm, UVW, A1, A2, spectra, bandpass, freqs,
                auto_gains, cross_gains):
 
     with h5py.File(save_file, 'a') as fp:
@@ -10,7 +10,8 @@ def save_input(save_file, target, lm, UVW, A1, A2, spectra, bandpass,
         fp['/input/A1'] = A1
         fp['/input/A2'] = A2
         fp['/input/spectra'] = spectra
-        fp['/input/bandpass'] = bandpass
+        fp['/input/frequencies'] = freqs
+        fp['/input/bandpass'] = bandpass.real
         fp['/input/auto_pol_gains'] = auto_gains
         fp['/input/cross_pol_gains'] = cross_gains
 

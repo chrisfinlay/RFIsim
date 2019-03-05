@@ -72,7 +72,6 @@ def get_bandpass_and_gains(target_flux, obs_times):
                                  amplitudes=np.random.randn(20, 2),
                                  time=obs_times) for i in range(n_ant)])
 
-    print(gain_drift.T[:,:,None,None].shape)
     bandpass = bandpass*gain_drift.T[:,:,None,None]
 
     return bandpass, antenna_gains_auto, antenna_gains_cross

@@ -87,9 +87,9 @@ def call_solver(rfi_run, time_step):
 
         FITSfiles = 'utils/telescope/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
 
-        source = RFISourceProvider(rfi_run, n_time, n_chan, n_ant,
-                                  bandpass, gauss_sources, rfi_spectra,
-                                  rfi_lm, phase_centre, time_step, A1, A2, UVW)
+        source = RFISourceProvider(rfi_run, n_time, n_chan, n_ant, freqs,
+                                   bandpass, gauss_sources, rfi_spectra,
+                                   rfi_lm, phase_centre, time_step, A1, A2, UVW)
         # Create RFI Source and Sink Providers
         source_provs = [source,
                         FitsBeamSourceProvider(FITSfiles)
@@ -117,6 +117,8 @@ sky_radius = args.radius
 noise = args.noise
 n_sats = args.nsats
 save_dir = args.save_dir
+freqs = np.loadtxt('utils/telescope/bandpass/MeerKAT_L-Band_Frequencies.csv',
+                    delimiter=',')
 
 ########## Fixed Parameters ####################################################
 
@@ -185,7 +187,7 @@ save_file = 'date=' + str(date) + '_ra=' + str(round(target_ra, 2)) + \
 
 save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, rfi_lm, UVW, A1, A2, rfi_spectra, bandpass,
-           auto_gains, cross_gains)
+           freqs, auto_gains, cross_gains)
 
 with open('timings.txt', 'a') as t:
     now = str(datetime.datetime.now()+datetime.timedelta(hours=2))
