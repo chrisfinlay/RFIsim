@@ -21,7 +21,7 @@ If you have an Nvidia GPU capable of running TensorFlow code then make sure you 
 To get the docker environment running to use this tool simply run the following command.
 
 ```
-nvidia-docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-fixed-gpu
+nvidia-docker run -it -v dir/on/host:/data chrisjfinlay/montblanc:ddfacet-gpu-fixed-0.1
 cd /data
 git clone https://github.com/chrisfinlay/RFIsim.git
 cd /data/RFIsim/utils/astronomical/catalogues

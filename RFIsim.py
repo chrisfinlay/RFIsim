@@ -52,13 +52,13 @@ def create_parser():
     parser.add_argument("--radius", default=10, type=float,
                         help="""Radius around target in which to include
                         astronomical sources in degrees""")
-    parser.add_argument("--noise", default=0.5, type=float,
+    parser.add_argument("--noise", default=0.3, type=float,
                         help="Absolute noise level in the visibilities.")
     parser.add_argument("--nsats", default=20, type=int,
                         help="Number of satellite RFI sources to consider.")
     parser.add_argument("--save_dir", default='.', type=str,
                         help="Directory to save ouput files.")
-    parser.add_argument("--gpu", default=-1, type=int,
+    parser.add_argument("--gpu", default=0, type=int,
                         help="""GPU id e.g 0. If you want to run on the CPU
                         use -1.""")
 
@@ -98,7 +98,7 @@ def call_solver(rfi_run, time_step):
 
         # Call solver, supplying source and sink providers
         slvr.solve(source_providers=source_provs,
-                sink_providers=sink_provs)
+                   sink_providers=sink_provs)
 
 
 ########## Run Simulation ######################################################
