@@ -39,19 +39,28 @@ python RFIsim.py
 ```
 /
 |--- input
-|       |--- target                (RA, DEC)
-|       |--- lm                    (time_steps, n_srcs, {l,m})
-|       |--- UVW                   (time_steps*n_bl, {u,v,w})
-|       |--- A1                    (n_bl)
-|       |--- A2                    (n_bl)
-|       |--- spectra               (n_srcs, time_steps, freq_chans, n_pols)
-|       |--- bandpass              (time_steps, n_ants, freq_chans, n_pols)
-|       |--- frequencies           (freq_chans)
-|       |--- auto_pol_gains        (1)
-|       |--- cross_pol_gains       (1)
+|       |--- target                  (RA, DEC)
+|       |--- astro_sources           (n_astro_srcs, 7)
+|       |--- astro_sources_headings  (7)
+|       |--- rfi_lm                  (time_steps, n_rfi_srcs, {l,m})
+|       |--- rfi_spectra             (n_rfi_srcs, time_steps, freq_chans, n_pols)
+|       |--- UVW                     (time_steps*n_bl, {u,v,w})
+|       |--- A1                      (n_bl)
+|       |--- A2                      (n_bl)
+|       |--- bandpass                (time_steps, n_ants, freq_chans, n_pols)
+|       |--- frequencies             (freq_chans)
+|       |--- auto_pol_gains          (1)
+|       |--- cross_pol_gains         (1)
 |--- output
-        |--- vis_clean             (time_steps, n_bl, freq_chans, n_pols)
-        |--- vis_dirty             (time_steps, n_bl, freq_chans, n_pols)
+        |--- vis_clean               (time_steps, n_bl, freq_chans, n_pols)
+        |--- vis_dirty               (time_steps, n_bl, freq_chans, n_pols)
+```
+
+To get the DataFrame of astronomical source parameters used in the simulation.
+```
+with h5py.File('test.h5', 'r') as fp:
+    srcs_df = pd.DataFrame(data=fp['input/astro_sources'].value,
+                           columns=fp['input/astro_sources_headings'].value)
 ```
 
 ## Built With

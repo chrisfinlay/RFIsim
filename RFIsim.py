@@ -88,7 +88,7 @@ def call_solver(rfi_run, time_step):
         FITSfiles = 'utils/telescope/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
 
         source = RFISourceProvider(rfi_run, n_time, n_chan, n_ant, freqs,
-                                   bandpass, gauss_sources, rfi_spectra,
+                                   bandpass, astro_srcs, rfi_spectra,
                                    rfi_lm, phase_centre, time_step, A1, A2, UVW)
         # Create RFI Source and Sink Providers
         source_provs = [source,
@@ -148,7 +148,7 @@ A1, A2 = np.triu_indices(n_ant, 1)
 
 ##### Get astronomical sources #################################################
 
-gauss_sources = inview(phase_centre, sky_radius, min_flux)
+astro_srcs = inview(phase_centre, sky_radius, min_flux)
 
 #### Get lm tracks of satellites ##### lm shape (time_steps, vis_sats+1, 2) ####
 sat_lm, obs_times = get_lm_tracks(phase_centre, transit, tracking_hours,
@@ -186,8 +186,8 @@ save_file = 'date=' + str(date) + '_ra=' + str(round(target_ra, 2)) + \
             '_noise=' + str(round(noise,3)) + '.h5'
 
 save_file = os.path.join(save_dir, save_file)
-save_input(save_file, phase_centre, rfi_lm, UVW, A1, A2, rfi_spectra, bandpass,
-           freqs, auto_gains, cross_gains)
+save_input(save_file, phase_centre, astro_srcs, rfi_lm, UVW, A1, A2,
+           rfi_spectra, bandpass, freqs, auto_gains, cross_gains)
 
 with open('timings.txt', 'a') as t:
     now = str(datetime.datetime.now()+datetime.timedelta(hours=2))

@@ -132,6 +132,10 @@ class RFISourceProvider(SourceProvider):
         stokes[:,:,:,0] = self.gauss_sources['Flux'].values[:,None,None]
         stokes[:,:,:,1:] = 0.0
 
+        f0 = 843e6
+        alpha = self.gauss_sources['SpecIndx'].values[:,None,None,None]
+        stokes *= (self.freqs[None,None,:,None]/f0)**alpha
+
         return stokes[lg:ug, lt:ut, lc:uc, :]
 
     def direction_independent_effects(self, context):
