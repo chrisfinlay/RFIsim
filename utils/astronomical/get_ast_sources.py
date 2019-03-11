@@ -8,7 +8,8 @@ from utils.rfi.sat_sim.sim_sat_paths import angular_separation
 def inview(phase_centre, radius, min_flux):
     """
     Search NVSS and SUMSS catalogues for radio sources within the FoV and
-    brighter than a minimum flux.
+    brighter than a minimum flux. Spectral indices randomly assigned according
+    to 'Spectral index properties of milliJansky radio sources, K.E. Randall'
 
     Parameters
     ----------

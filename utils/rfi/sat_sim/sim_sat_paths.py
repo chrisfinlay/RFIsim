@@ -5,6 +5,10 @@ import numpy as np
 from glob import glob
 from pyrap.measures import measures
 import sys
+import os
+import spacetrack.operators as op
+from spacetrack import SpaceTrackClient
+import pandas as pd
 sys.path.insert(0, '../../..')
 from utils.helper.parallelize import parmap
 
@@ -64,7 +68,67 @@ def angular_separation(ra, dec, phase_centre):
 
     return theta
 
-def read_tles(tle_dir='utils/rfi/sat_sim/TLEs/'):
+def get_archival_tles(start_date, end_date):
+    """
+    Collect TLEs for a specific date range.
+
+    Parameters
+    ----------
+    start_date: Datetime object
+        Start date and time of observation.
+    end_date: Datetime object
+        End date and time of observation.
+
+    Returns
+    -------
+    file_path: str
+        File path to TLE file.
+    """
+
+    tle_file = start_date.strftime('%Y-%m-%d')+'.tle'
+    file_path = os.path.join('utils/rfi/sat_sim/TLEs', tle_file)
+
+    if os.path.isfile(file_path) and os.access(file_path, os.R_OK):
+            print('File {} exists and is readable.'.format(tle_file))
+            return file_path
+
+    st = SpaceTrackClient('cfinlay@ska.ac.za', 'SARAORFIsimulator')
+
+    drange = op.inclusive_range(start_date, end_date)
+
+    tles = [x.encode() for x in st.tle(iter_lines=True, epoch=drange, orderby='TLE_LINE1', format='tle')]
+
+    ids = []
+    for i in range(len(tles)/2):
+        ids.append(int(tles[1::2][i].split()[1]))
+
+    tles = pd.DataFrame(np.array([[tles[::2], tles[1::2]]])[0].T, index=ids)
+
+    tles = tles[~tles.index.duplicated()]
+    tles.index.name = 'NORAD_ID'
+    tles.columns = ['E1', 'E2']
+
+    sat_names = pd.read_csv('utils/rfi/sat_sim/TLEs/sat_names.csv', index_col='NORAD_ID')
+    sat_names.index = sat_names.index.astype(np.int64)
+
+    merged = pd.concat([tles, sat_names], axis=1, join='inner')
+
+    #     if L_band:
+    #         sat_are = ['GLONASS','Inmarsat','IRIDIUM','BEIDOU','BIIR','GALILEO','IRNSS','NAVSTAR','ALPHASAT','QZS']
+    #         pattern = '|'.join(sat_are)
+    #         satcat_df = satcat_df[satcat_df['Satellite_Name'].str.contains(pattern, na = False)]
+    #         satcat_df = satcat_df.reset_index()
+    #         del satcat_df['index']
+
+    print('\nWriting TLE file to {}\n'.format(file_path))
+
+    with open(file_path, 'w') as f:
+        for i in range(len(merged)):
+            f.write('\n'.join(list(merged.iloc[i].values[[-1,0,1]]))+'\n')
+
+    return file_path
+
+def read_tles(tle_path):
     """
     Convert TLE text files in a given directory to a list of TLEs.
 
@@ -78,10 +142,8 @@ def read_tles(tle_dir='utils/rfi/sat_sim/TLEs/'):
     sats : List of lists.
         Each internal list has the 3 lines of a TLE as its elements.
     """
-    tlefiles = glob(tle_dir+'*.txt')
-    tles = []
-    for tlefile in tlefiles:
-        tles += [line.rstrip() for line in open(tlefile)]
+
+    tles = [line.rstrip() for line in open(tle_path)]
     sats = [tles[3*i:(3*i+3)] for i in range(len(tles)//3)]
 
     return sats
@@ -206,7 +268,19 @@ def get_lm_tracks(phase_centre, transit, tracking_hours,
     start_time = datetime.datetime.strptime(transit, '%a %b %d %H:%M:%S %Y') - \
                  datetime.timedelta(seconds=3600*tracking_hours/2)
 
-    sats = read_tles()
+    now = datetime.datetime.now()
+
+    # norad_ids = get_norad_ids()
+
+    if (now - start_time).total_seconds()<0:
+        print('\nSimulating a future observation is only possible while the TLE for the satellites is still valid\n')
+        tle_path = get_archival_tles(now-datetime.timedelta(seconds=3600*24), now)
+    else:
+        tle_path = get_archival_tles(start_time,
+                                     start_time+datetime.timedelta(seconds=3600*24))
+
+    sats = read_tles(tle_path)
+
     time_steps = int(3600*tracking_hours/integration_secs)
 
     # Set up argument list for parallelization

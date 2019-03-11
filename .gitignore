@@ -11,3 +11,4 @@ timings.txt
 *.ipynb
 *.ipynb_checkpoints
 *.h5
+*.tle
