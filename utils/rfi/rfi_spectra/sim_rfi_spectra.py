@@ -84,10 +84,8 @@ def rfi_dist(n_rfi, channels=150, n_chan=4096):
     samples -= int(channels/2)
     samples = samples[(samples>0) & (samples<n_chan-channels)]
     samples = samples[np.random.permutation(len(samples))]
-    
-    freq_i = samples[:n_rfi]
 
-    print(freq_i)
+    freq_i = samples[:n_rfi]
 
     return freq_i, freq_i+channels
 

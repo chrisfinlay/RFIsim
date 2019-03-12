@@ -9,6 +9,7 @@ import os
 import montblanc
 from montblanc.impl.rime.tensorflow.sources import SourceProvider
 from montblanc.impl.rime.tensorflow.sources import FitsBeamSourceProvider
+from montblanc.impl.rime.tensorflow.sources import CachedSourceProvider
 from montblanc.impl.rime.tensorflow.sinks import SinkProvider
 import montblanc.util as mbu
 
@@ -99,7 +100,7 @@ def call_solver(rfi_run, time_step):
         sink_provs = [RFISinkProvider(vis, rfi_run, time_step, noise)]
 
         # Call solver, supplying source and sink providers
-        slvr.solve(source_providers=source_provs,
+        slvr.solve(source_providers=[CachedSourceProvider(x) for x in source_provs],
                    sink_providers=sink_provs)
 
 
