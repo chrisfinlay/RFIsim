@@ -80,15 +80,14 @@ def rfi_dist(n_rfi, channels=150, n_chan=4096):
         ends.
     """
 
-    samples = np.random.randint(0, n_chan-channels, size=(int(1e6)))
-    rfi_p = np.concatenate((samples[(samples>330) & (samples<400)],
-                          samples[(samples>1040) & (samples<1050)],
-                          samples[(samples>1320) & (samples<2020)],
-                          samples[(samples>3120) & (samples<3520)]))
-    rfi_p = np.concatenate((rfi_p, np.random.randint(0, n_chan-channels,
-                                                     size=len(rfi_p))))
-    perm = np.random.permutation(len(rfi_p))
-    freq_i = (rfi_p[perm])[:n_rfi]
+    samples = np.load('utils/rfi/rfi_spectra/MeerKAT_RFI_Prob_Frequency.npy')
+    samples -= int(channels/2)
+    samples = samples[(samples>0) & (samples<n_chan-channels)]
+    samples = samples[np.random.permutation(len(samples))]
+    
+    freq_i = samples[:n_rfi]
+
+    print(freq_i)
 
     return freq_i, freq_i+channels
 
@@ -154,12 +153,5 @@ def get_rfi_spectra(n_chan, n_rfi, n_time):
     time_dep = np.array([rfi_time_variation(modes=np.random.random(20),
                                  amplitudes=np.random.randn(20, 2),
                                  time=np.arange(n_time)) for i in range(n_rfi)])
-
-    print(time_dep.shape)
-    print(time_dep)
-    print(stokes.shape)
-    print(stokes)
-    print(spectrogram.shape)
-    print(spectrogram)
 
     return spectrogram*stokes*time_dep[:,:,None,None]

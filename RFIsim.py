@@ -58,6 +58,8 @@ def create_parser():
                         help="Number of satellite RFI sources to consider.")
     parser.add_argument("--save_dir", default='.', type=str,
                         help="Directory to save ouput files.")
+    parser.add_argument("--timing", default='timings.txt', type=str,
+                        help="Path to file to save timing information.")
     parser.add_argument("--gpu", default=0, type=int,
                         help="""GPU id e.g 0. If you want to run on the CPU
                         use -1.""")
@@ -189,7 +191,7 @@ save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, astro_srcs, rfi_lm, UVW, A1, A2,
            rfi_spectra, bandpass, freqs, auto_gains, cross_gains)
 
-with open('timings.txt', 'a') as t:
+with open(args.timing, 'a') as t:
     now = str(datetime.datetime.now()+datetime.timedelta(hours=2))
     t.write('\n-----------------------'+now+'-------------------------\n\n')
     t.write(save_file)
@@ -216,7 +218,7 @@ for j in range(2):
     save_output(save_file, vis, clean=j)
     if j==0:
         dirty_time = round(tme.time()-run_start[0], 2)
-        with open('timings.txt', 'a') as t:
+        with open(args.timing, 'a') as t:
             t.write('\nDirty Completion time : {} s\n'.format(dirty_time))
 
 clean_time = round(tme.time()-run_start[1], 2)
@@ -225,6 +227,6 @@ print('\n\nDirty Completion time : {} s\n'.format(dirty_time))
 print('\nClean Completion time : {} s\n'.format(clean_time))
 print('\nTotal Completion time : {} s\n\n'.format(total_time))
 
-with open('timings.txt', 'a') as t:
+with open(args.timing, 'a') as t:
     t.write('\nClean Completion time : {} s\n'.format(clean_time))
     t.write('\nTotal Completion time : {} s\n\n'.format(total_time))
