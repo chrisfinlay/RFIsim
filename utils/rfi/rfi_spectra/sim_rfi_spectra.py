@@ -26,14 +26,18 @@ def pulse(x, A, m, s, n):
     """
     return A*np.exp(-0.5*np.abs(((x-m)/s))**n)
 
-def signal(x):
+def random_spectra(x, s, n):
     """
-    Create a random signal composed of random sersic profile pulses and noise.
+    Create a random signal composed of 2-5 random pulses and noise.
 
     Parameters
     ----------
     x: array
         Domain over which to evaluate signal.
+    s: float
+        Maximum pulse width.
+    n: float
+        Sersic index.
 
     Returns
     -------
@@ -41,11 +45,15 @@ def signal(x):
         Constructed random signal.
     """
 
-    s = np.sum([pulse(x, 1+0.3*np.random.random(), 60*np.random.random()+20,
-                      3*np.random.random(), 4*np.random.random()+1)
-                for _ in range(np.random.randint(2, 7))], axis=0)
+    centre_band = int(0.6*len(x))
+    edge = int(0.2*len(x))
 
-    s += 0.05*np.random.randn(len(x))
+    s = np.sum([pulse(x, 0.7+0.6*np.random.random(),
+                      centre_band*np.random.random()+edge,
+                      s*np.random.random(), n)
+                for _ in range(np.random.randint(2, 6))], axis=0)
+
+    s += 0.03*np.random.randn(len(x))
     s -= np.min(s)
     s *= pulse(x, 1, np.mean(x), (x[-1]-x[0])/3., 10)
 
@@ -191,16 +199,15 @@ def get_rfi_spectra(n_chan, n_rfi, n_time, type='s'):
 
     type = type.lower()[0]
 
+    x = np.arange(100)
+
     if type=='s':
-        x = np.arange(100)
-        spectra = np.array([signal(x) for _ in range(n_rfi)])
-
-    elif type=='g' or type=='r':
-        if type=='g':
-            file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_100_gauss.npy'
-        else:
-            file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_100_complex.npy'
-
+        spectra = np.array([random_spectra(x, s=3., n=4*np.random.random()+1)
+                            for _ in range(n_rfi)])
+    elif type=='g':
+        spectra = np.array([random_spectra(x, s=2., n=2) for _ in range(n_rfi)])
+    else:
+        file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_real.npy'
         spectra = np.load(file_path)
         perm = np.random.permutation(len(spectra))
         spectra[perm] = spectra

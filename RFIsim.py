@@ -186,11 +186,12 @@ bandpass, auto_gains, cross_gains = get_bandpass_and_gains(target_flux,
 date = datetime.datetime.strptime(transit,
                                   '%a %b %d %H:%M:%S %Y').strftime('%Y-%m-%d')
 
-save_file = 'date=' + str(date) + '_ra=' + str(round(target_ra, 2)) + \
-            '_dec=' + str(round(target_dec, 2)) + '_int_secs=' + \
-            str(integration_secs) + '_timesteps=' + \
-            str(time_steps) + '_nants=' + str(n_ant) + \
-            '_noise=' + str(round(noise,3)) + '.h5'
+save_file = 'date={0}_ra={1}_dec={2}_int_secs={3}_timesteps={4}_nants={5}' \
+            '_noise={6}_rfi={7}.h5'.format(date, round(target_ra, 2),
+                                           round(target_dec, 2),
+                                           integration_secs, time_steps,
+                                           n_ant, round(noise,3),
+                                           args.rfi_sig)
 
 save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, astro_srcs, rfi_lm, UVW, A1, A2,
