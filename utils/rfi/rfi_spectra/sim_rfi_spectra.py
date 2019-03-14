@@ -1,5 +1,56 @@
 import numpy as np
 
+def pulse(x, A, m, s, n):
+    """
+    Create a sersic profile pulse.
+
+    $A\exp{-0.5(|x-m|/|s|)^n}$
+
+    Parameters
+    ----------
+    x: array
+        Domain over which to evaluate the pulse.
+    A: float
+        Amplitude of the pulse.
+    m: float
+        Position of the pulse in the domain.
+    s: float
+        Width of the pulse.
+    n: float
+        Sersic index of the pulse. e.g. n=2 corresponds to a gaussian
+
+    Returns
+    -------
+    pulse: array
+        Values of the pulse at domain sample points.
+    """
+    return A*np.exp(-0.5*np.abs(((x-m)/s))**n)
+
+def signal(x):
+    """
+    Create a random signal composed of random sersic profile pulses and noise.
+
+    Parameters
+    ----------
+    x: array
+        Domain over which to evaluate signal.
+
+    Returns
+    -------
+    signal: array
+        Constructed random signal.
+    """
+
+    s = np.sum([pulse(x, 1+0.3*np.random.random(), 60*np.random.random()+20,
+                      3*np.random.random(), 4*np.random.random()+1)
+                for _ in range(np.random.randint(2, 7))], axis=0)
+
+    s += 0.05*np.random.randn(len(x))
+    s -= np.min(s)
+    s *= pulse(x, 1, np.mean(x), (x[-1]-x[0])/3., 10)
+
+    return s
+
 def rfi_time_variation(modes, amplitudes, time):
     """
     Construct periodic signal from Fourier modes and accompanying amplitudes.
@@ -114,7 +165,7 @@ def rfi_stokes(n_rfi):
 
     return stokes_rfi[:,None,None,:]
 
-def get_rfi_spectra(n_chan, n_rfi, n_time):
+def get_rfi_spectra(n_chan, n_rfi, n_time, type='s'):
     """
     Assign spectra to RFI sources.
 
@@ -126,6 +177,11 @@ def get_rfi_spectra(n_chan, n_rfi, n_time):
         Number of RFI sources.
     n_time: int
         Number of time steps.
+    type: char
+        Type of RFI spectra to use.
+        s := sersic profiles
+        g := gaussian profiles
+        r := real profiles
 
     Returns
     -------
@@ -133,13 +189,25 @@ def get_rfi_spectra(n_chan, n_rfi, n_time):
         Polarmetric spectrum for each RFI source at each time step.
     """
 
-    file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra.npy'
-    spectra = np.load(file_path)
-    perm = np.random.permutation(len(spectra))
-    spectra[perm] = spectra
+    type = type.lower()[0]
+
+    if type=='s':
+        x = np.arange(100)
+        spectra = np.array([signal(x) for _ in range(n_rfi)])
+
+    elif type=='g' or type=='r':
+        if type=='g':
+            file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_100_gauss.npy'
+        else:
+            file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_100_complex.npy'
+
+        spectra = np.load(file_path)
+        perm = np.random.permutation(len(spectra))
+        spectra[perm] = spectra
 
     rfi_spectrum = wrap_spectra(spectra, n_rfi)
-    freq_i, freq_f = rfi_dist(n_rfi)
+
+    freq_i, freq_f = rfi_dist(n_rfi, channels=rfi_spectrum.shape[1])
 
     spectrogram = np.zeros((n_rfi, n_time, n_chan, 1), dtype=np.float64)
 
@@ -152,4 +220,7 @@ def get_rfi_spectra(n_chan, n_rfi, n_time):
                                  amplitudes=np.random.randn(20, 2),
                                  time=np.arange(n_time)) for i in range(n_rfi)])
 
-    return spectrogram*stokes*time_dep[:,:,None,None]
+    spectrogram = spectrogram*stokes
+    spectrogram = spectrogram*time_dep[:,:,None,None]
+
+    return spectrogram

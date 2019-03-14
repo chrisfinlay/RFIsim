@@ -57,6 +57,8 @@ def create_parser():
                         help="Absolute noise level in the visibilities.")
     parser.add_argument("--nsats", default=20, type=int,
                         help="Number of satellite RFI sources to consider.")
+    parser.add_argument("--rfi_sig", default='sersic', type=str,
+                        help="Type of spectra to use for RFI. {sersic, gauss, real}")
     parser.add_argument("--save_dir", default='.', type=str,
                         help="Directory to save ouput files.")
     parser.add_argument("--timing", default='timings.txt', type=str,
@@ -100,7 +102,8 @@ def call_solver(rfi_run, time_step):
         sink_provs = [RFISinkProvider(vis, rfi_run, time_step, noise)]
 
         # Call solver, supplying source and sink providers
-        slvr.solve(source_providers=[CachedSourceProvider(x) for x in source_provs],
+        slvr.solve(#source_providers=[CachedSourceProvider(x) for x in source_provs],
+                   source_providers=source_provs,
                    sink_providers=sink_provs)
 
 
@@ -170,7 +173,8 @@ n_rfi = rfi_lm.shape[1]
 
 ###### Get satellite spectra ###################################################
 
-rfi_spectra = get_rfi_spectra(n_chan=n_chan, n_rfi=n_rfi, n_time=time_steps)
+rfi_spectra = get_rfi_spectra(n_chan=n_chan, n_rfi=n_rfi,
+                              n_time=time_steps, type=args.rfi_sig)
 
 ###### Get bandpass ############################################################
 

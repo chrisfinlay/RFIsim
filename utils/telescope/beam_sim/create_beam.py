@@ -97,9 +97,9 @@ def cross_beam(ll, mm, ff, a=2.5e-2, b=3e-2):
     rr = np.sqrt(ll**2+mm**2)
     lam = 2*np.pi/123
     phi = np.deg2rad(140-180)
-    sig = [1.2e-1, 1e-3, 1410, 4e-4]
-    sigmoid = (sig[1]/(1+np.exp(-(sig[0]*(ff-sig[2])))) + sig[3])
-    freq_dep = np.exp(-1j*(lam*ff-phi))*sigmoid
+    # sig = [1.2e-1, 1e-3, 1410, 4e-4]
+    # sigmoid = (sig[1]/(1+np.exp(-(sig[0]*(ff-sig[2])))) + sig[3])
+    freq_dep = np.exp(-1j*(lam*ff-phi))#*sigmoid
     beam = -ll*mm*np.sinc(a*rr*ff)*np.exp(-(rr/b)**2)*freq_dep
 
     return beam
