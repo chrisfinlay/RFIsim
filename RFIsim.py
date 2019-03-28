@@ -37,7 +37,7 @@ def create_parser():
     parser.add_argument("--ntime", default=5, type=int,
                         help="Number of timesteps")
     parser.add_argument("--intsecs", default=8, type=int,
-                        help="Integration time per time step in seconds"),
+                        help="Integration time per time step in seconds")
     parser.add_argument("--nant", default=4, type=int,
                         help="Number of antenna")
     parser.add_argument("--ra", default=295.0, type=float,
@@ -195,7 +195,7 @@ save_file = 'date={0}_ra={1}_dec={2}_int_secs={3}_timesteps={4}_nants={5}' \
 
 save_file = os.path.join(save_dir, save_file)
 save_input(save_file, phase_centre, astro_srcs, rfi_lm, UVW, A1, A2,
-           rfi_spectra, bandpass, freqs, auto_gains, cross_gains)
+           rfi_spectra, bandpass, freqs, auto_gains, cross_gains, obs_times)
 
 with open(args.timing, 'a') as t:
     now = str(datetime.datetime.now()+datetime.timedelta(hours=2))

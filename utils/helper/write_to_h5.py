@@ -1,7 +1,7 @@
 import h5py
 
 def save_input(save_file, target, astro_srcs, rfi_lm, UVW, A1, A2, rfi_spectra,
-               bandpass, freqs, auto_gains, cross_gains):
+               bandpass, freqs, auto_gains, cross_gains, obs_times):
 
     with h5py.File(save_file, 'a') as fp:
         fp['/input/target'] = target
@@ -16,6 +16,7 @@ def save_input(save_file, target, astro_srcs, rfi_lm, UVW, A1, A2, rfi_spectra,
         fp['/input/bandpass'] = bandpass.real
         fp['/input/auto_pol_gains'] = auto_gains
         fp['/input/cross_pol_gains'] = cross_gains
+        fp['/input/unix_times'] = obs_times
 
 def save_output(save_file, vis, clean):
 
