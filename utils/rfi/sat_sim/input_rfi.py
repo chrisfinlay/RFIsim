@@ -97,3 +97,78 @@ def avg_redundant_and_reshape(tele, vis):
         red_cnt[corr_idx_VV,:] += 1
 
     return np.divide(new_vis, red_cnt, out=np.zeros_like(new_vis), where=red_cnt!=0)
+
+def add_rfi_to_H5(path_to_timestream, red_V):
+    """
+    Add the visibility contribution from RFI into the visibility H5 files.
+
+    Parameters:
+    -----------
+    path_to_timestream: str
+        Path to the directory containing each frequency channel.
+    red_V: np.array (t_steps,n_bl,n_freqs)
+        The visibilities on each unique correlation product.
+    """
+
+    for i in range(red_V.shape[-1]):
+        path = os.path.join(path_to_timestream, str(i))
+        with h5py.File(os.path.join(path, 'timestream.hdf5'), 'r+') as fp:
+            timestream = fp[('timestream')]
+            timestream[...] += red_V[:,3:,i].T
+
+def get_rfi_vis_all_time(tele, date, n_time):
+    """
+    Calculate the visibilities for all time steps.
+
+    Parameters:
+    ----------
+    tele: hirax_transfer.core.HIRAXSurvey
+        HIRAX Telescope object.
+    date: str
+        The date on which to simulate RFI.
+    n_time: int
+        The number of time steps to simulate.
+
+    Return:
+    -------
+    red_V: np.array (t_steps,n_bl,n_freqs)
+        The visibilities
+    """
+
+    with open('prod_params.yaml') as f:
+        tele = HIRAXSurvey.from_config(yaml.load(f, Loader=yaml.BaseLoader)['telescope'])
+
+    n_ants = tele.nfeed/2/len(tele.pointings)
+
+    enu = tele.feedpositions[:n_ants,:]
+    enu = np.concatenate([enu, 1110.*np.ones(len(enu))[:,None]], axis=1)
+
+    freqs = tele.frequencies
+
+    gps_ants = enu_to_gps_el([-30.69, 21.57527778], enu)
+
+    midnight = datetime.datetime(2019, 6, 28, 0, 0, 0)
+    one_day = datetime.timedelta(seconds=3600*24)
+    time_step = datetime.timedelta(seconds=3600*24/n_time)
+
+    tles = tle_load.tle(get_archival_tles(midnight, midnight+one_day))
+
+    red_V = np.zeros((n_time,tele.nbase,len(freqs)), np.complex128)
+
+    for i in range(n_time):
+        el, distances, seps = np.array([get_dist_and_sep(tles[tles.keys()[0]], gps,
+                                                            0., midnight+time_step*i) for gps in gps_ants]).T
+        delays = get_time_delays(distances)
+        RFI_intensity = 1e11
+        rfi_I = RFI_intensity*np.ones((1, len(freqs)))
+        rfi_Q = RFI_intensity*np.zeros((1, len(freqs)))
+        rfi_U = np.zeros((1, len(freqs)))
+        rfi_V = np.zeros((1, len(freqs)))
+
+        E = pol_beam(auto_beam=sinc_beam, cross_beam=None, params=[2., freqs],
+                     ang_sep=np.mean(seps, keepdims=True))
+        B = brightness_matrix(rfi_I, rfi_Q, rfi_U, rfi_V)
+        V = RIME(B, E, delays[:,None], freqs)
+        red_V[i] = avg_redundant_and_reshape(tele, V)
+
+    return red_V
