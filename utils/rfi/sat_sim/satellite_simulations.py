@@ -178,6 +178,77 @@ def sinc_beam(ang_sep, params):
 
     return beam
 
+def auto_beam(ll, mm, ff, a=3e-2, b=2*np.pi/123, phi=320):
+    """
+    Generate the complex beam cube for the auto-polarizations (HH, VV).
+
+    Parameters
+    ----------
+    ll : ndarray
+        Array of shape (channels, resolution, resolution) containing the l
+        coordinate points varying along axis 1.
+    mm : ndarray
+        Array of shape (channels, resolution, resolution) containing the m
+        coordinate points varying along axis 2.
+    ff : ndarray
+        Array of shape (channels, resolution, resolution) containing the
+        frequency coordinate points varying along axis 0.
+    a : float
+        Width of the sinc component of the beam.
+    b : float
+        Oscillatory frequency of the complex exponential component.
+    phi : float
+        Phase offset in the complex exponential component in degrees.
+
+    Returns
+    -------
+    beam : ndarray
+        Array of shape (channels, resolution, resolution) containing the
+        complex values of the beam sensitivity.
+    """
+    phi = np.deg2rad(phi)
+    rr = np.sqrt(ll**2+mm**2)
+    beam = np.exp(-1j*(ff*b - phi))*np.sinc(a*rr*ff)
+
+    return beam
+
+def cross_beam(ll, mm, ff, a=2.5e-2, b=3e-2):
+    """
+    Generate the complex beam cube for the cross-polarizations (HV, VH).
+
+    Parameters
+    ----------
+    ll : ndarray
+        Array of shape (channels, resolution, resolution) containing the l
+        coordinate points varying along axis 1.
+    mm : ndarray
+        Array of shape (channels, resolution, resolution) containing the m
+        coordinate points varying along axis 2.
+    ff : ndarray
+        Array of shape (channels, resolution, resolution) containing the
+        frequency coordinate points varying along axis 0.
+    a : float
+        Width of the sinc component of the beam.
+    b : float
+        Characteristic distance of the exponential dropoff component.
+
+    Returns
+    -------
+    beam : ndarray
+        Array of shape (channels, resolution, resolution) containing the
+        complex values of the beam sensitivity.
+    """
+    rr = np.sqrt(ll**2+mm**2)
+    lam = 2*np.pi/123
+    phi = np.deg2rad(140-180)
+    # sig = [1.2e-1, 1e-3, 1410, 4e-4]
+    # sigmoid = (sig[1]/(1+np.exp(-(sig[0]*(ff-sig[2])))) + sig[3])
+    freq_dep = np.exp(-1j*(lam*ff-phi))#*sigmoid
+    beam = -ll*mm*np.sinc(a*rr*ff)*np.exp(-(rr/b)**2)*freq_dep
+
+    return beam
+
+
 def pol_beam(auto_beam, cross_beam, params, ang_sep):
     """
     Calculate the attenuation due to the primary beam for a
