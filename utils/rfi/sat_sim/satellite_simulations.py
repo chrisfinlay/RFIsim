@@ -25,7 +25,8 @@ def get_archival_tles(start_date, end_date):
     """
 
     tle_file = start_date.strftime('%Y-%m-%d')+'.tle'
-    file_path = os.path.join('TLEs', tle_file)
+    tle_dir = '/home/chris/HIRAX/RFIsim/utils/rfi/sat_sim/TLEs'
+    file_path = os.path.join(tle_dir, tle_file)
 
     if os.path.isfile(file_path) and os.access(file_path, os.R_OK):
             print('File {} exists and is readable.'.format(tle_file))
@@ -35,11 +36,14 @@ def get_archival_tles(start_date, end_date):
 
     drange = op.inclusive_range(start_date, end_date)
 
-    tles = [x.encode() for x in st.tle(iter_lines=True, epoch=drange,
-                                       orderby='TLE_LINE1', format='tle')]
+    norad_ids = list(np.load('norad_ids.npy'))
+    
+    tles = [x for x in st.tle(iter_lines=True, epoch=drange, orderby='TLE_LINE1', 
+                              format='tle', norad_cat_id=norad_ids)]
+    # x.encode() for python 2
 
     ids = []
-    for i in range(len(tles)/2):
+    for i in range(len(tles)//2):
         ids.append(int(tles[1::2][i].split()[1]))
 
     tles = pd.DataFrame(np.array([[tles[::2], tles[1::2]]])[0].T, index=ids)
@@ -48,7 +52,8 @@ def get_archival_tles(start_date, end_date):
     tles.index.name = 'NORAD_ID'
     tles.columns = ['E1', 'E2']
 
-    sat_names = pd.read_csv('TLEs/sat_names.csv', index_col='NORAD_ID')
+    sat_names_path = os.path.join(tle_dir, 'sat_names.csv')
+    sat_names = pd.read_csv(sat_names_path, index_col='NORAD_ID')
     new_index = []
     for i in range(len(sat_names)):
         new_index.append(int(sat_names.index.values[i].split()[-1]))
@@ -63,6 +68,61 @@ def get_archival_tles(start_date, end_date):
             f.write('\n'.join(list(merged.iloc[i].values[[-1,0,1]]))+'\n')
 
     return file_path
+
+def get_norad_ids(sat_class='all', save=True, remove_tles=True):
+    """
+    Get the NORAD IDs for a group of satellites.
+    
+    Parameters:
+    -----------
+    sat_class: str
+        Class of satellites to get IDs for.
+        Options - 
+        
+    Returns:
+    --------
+    ids: list
+        List of NORAD IDs.
+    """
+    sat_classes = {'gps': 'gps-ops.txt',
+                   'glonass': 'glo-ops.txt',
+                   'galileo': 'galileo.txt',
+                   'beidou': 'beidou.txt',
+                   'sbas': 'sbas.txt',
+                   'nnss': 'nnss.txt',
+                   'leo': 'musson.txt',
+                   'geosynchronous': 'geo.txt',
+#                    'geo_protected': 'gpz.php',
+#                    'geo_protected_plus': 'gpz-plus.php',
+                   'intelsat': 'intelsat.txt',
+                   'iridium': 'iridium.txt',
+                   'iridium_NEXT': 'iridium-NEXT.txt',
+                   'starlink': 'starlink.txt',
+                   'orbcomm': 'orbcomm.txt',
+                   'ses': 'ses.txt',
+                   'global_star': 'globalstar.txt',
+                  }
+                   
+    
+    norad_url = 'https://www.celestrak.com/NORAD/elements/'
+                   
+    if sat_class=='all':
+        ids = []
+        for i in range(len(sat_classes)):
+            tle_url = os.path.join(norad_url, sat_classes[list(sat_classes.keys())[i]])
+            ids += list(load.tle(tle_url).keys())[::4]
+            os.remove(sat_classes[list(sat_classes.keys())[i]])
+    else:
+        tle_url = os.path.join(norad_url, sat_classes[sat_class])
+        ids = list(load.tle(tle_url).keys())[::4]
+        os.remove(sat_classes[sat_class])
+        
+    ids = np.array([x for x in ids if isinstance(x, int)])
+    
+    if save:
+        np.save('norad_ids.npy', ids)
+    
+    return ids
 
 def get_dist_and_sep(sat_tle, ant_gps, pointing, time):
     """
@@ -136,19 +196,18 @@ def get_time_delays(distances):
 
     Parameters:
     -----------
-    distances: array-like (n_ants,)
-        The distance between an RFI source and each antenna in metres.
+    distances: array-like (n_time,n_src,n_ants)
+        The distance between an RFI sources and each antenna in metres.
 
     Returns:
     --------
-    delays: array-like (n_bl,)
-        The time delay of the time of arrival of the RFI signal between
-        each pair of antennas.
+    delays: array-like (n_time,n_src,n_bl)
+        The time delays of the RFI signals between each pair of antennas.
     """
 
     c = 2.99792458e8
-    a1, a2 = np.triu_indices(len(distances), 1)
-    delays = (distances[a1]-distances[a2])/c
+    a1, a2 = np.triu_indices(distances.shape[-1], 1)
+    delays = (distances[...,a1]-distances[...,a2])/c
 
     return delays
 
@@ -160,7 +219,7 @@ def sinc_beam(ang_sep, params):
 
     Paramters:
     ----------
-    ang_sep: np.array (n_srcs,)
+    ang_sep: np.array (n_time,n_ant,n_srcs)
         The radius at which to evaluate the beam function.
         Angular separation, in degrees, from the pointing direction.
     params: array-like (2,)
@@ -169,12 +228,12 @@ def sinc_beam(ang_sep, params):
 
     Returns:
     --------
-    beam: np.array (n_srcs,n_freqs)
+    beam: np.array (n_time,n_freqs,n_ant,n_srcs)
         The attenuation due to the beam at the given angular separation.
     """
 
     alpha, freq = params
-    beam = np.sinc(alpha*freq[None,:]*ang_sep[:,None])
+    beam = np.sinc(alpha*freq[None,:,None,None]*ang_sep[:,None,:,:,:])
 
     return beam
 

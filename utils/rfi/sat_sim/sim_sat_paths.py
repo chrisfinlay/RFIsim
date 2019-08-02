@@ -66,7 +66,7 @@ def angular_separation(ra, dec, phase_centre):
     theta = np.arccos(np.sin(dec1)*np.sin(dec2) + \
             np.cos(dec1)*np.cos(dec2)*np.cos(ra1-ra2))
 
-    return theta
+    return np.rad2deg(theta)
 
 def get_archival_tles(start_date, end_date):
     """
