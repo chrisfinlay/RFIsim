@@ -5,16 +5,7 @@ import time as tme
 import datetime
 import os
 
-# Montblanc imports
-import montblanc
-from montblanc.impl.rime.tensorflow.sources import SourceProvider
-from montblanc.impl.rime.tensorflow.sources import FitsBeamSourceProvider
-from montblanc.impl.rime.tensorflow.sources import CachedSourceProvider
-from montblanc.impl.rime.tensorflow.sinks import SinkProvider
-import montblanc.util as mbu
-
 # Internal imports
-from utils.RFIProviders import RFISourceProvider, RFISinkProvider
 from utils.helper.write_to_h5 import save_output, save_input
 from utils.telescope.uv_sim.uvgen import UVCreate
 from utils.telescope.bandpass.bandpass_gains import get_bandpass_and_gains
@@ -24,116 +15,22 @@ from utils.rfi.horizon_sim.horizon_sources import get_horizon_lm_tracks
 from utils.astronomical.get_ast_sources import inview, find_closest
 
 ######### Arg Parser ###########################################################
-def valid_date(s):
-    try:
-        datetime.datetime.strptime(s, "%Y/%m/%d")
-        return s
-    except ValueError:
-        msg = "Not a valid date: '{0}'.".format(s)
-        raise argparse.ArgumentTypeError(msg)
-
 def create_parser():
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ntime", default=5, type=int,
-                        help="Number of timesteps")
-    parser.add_argument("--intsecs", default=8, type=int,
-                        help="Integration time per time step in seconds")
-    parser.add_argument("--nant", default=4, type=int,
-                        help="Number of antenna")
-    parser.add_argument("--ra", default=295.0, type=float,
-                        help="""Right ascension of target direction in
-                        decimal degrees""")
-    parser.add_argument("--dec", default=-63.71, type=float,
-                        help="""Declination of target direction in
-                        decimal degrees""")
-    parser.add_argument("--date", default='2018/11/07', type=valid_date,
-                        help="Date of the observation. Format YYYY/MM/DD")
-    parser.add_argument("--minflux", default=0.5, type=float,
-                        help="Minimum flux of astronomical sources in Jy")
-    parser.add_argument("--radius", default=10, type=float,
-                        help="""Radius around target in which to include
-                        astronomical sources in degrees""")
-    parser.add_argument("--noise", default=0.3, type=float,
-                        help="Absolute noise level in the visibilities.")
-    parser.add_argument("--nsats", default=20, type=int,
-                        help="Number of satellite RFI sources to consider.")
-    parser.add_argument("--rfi_sig", default='sersic', type=str,
-                        help="Type of spectra to use for RFI. {sersic, gauss, real}")
-    parser.add_argument("--save_dir", default='.', type=str,
-                        help="Directory to save ouput files.")
-    parser.add_argument("--timing", default='timings.txt', type=str,
-                        help="Path to file to save timing information.")
-    parser.add_argument("--gpu", default=0, type=int,
-                        help="""GPU id e.g 0. If you want to run on the CPU
-                        use -1.""")
-
-
+    parser.add_argument('--config', default='config.yml', type=str,
+                        help='Config file')
     return parser
 
 args = create_parser().parse_args()
 
-if args.gpu == -1:
-    os.environ["CUDA_VISIBLE_DEVICES"]=""
-else:
-    os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)
-########## Configuration #######################################################
+######## Read Config ###########################################################
+config = load_config(args.config)
 
-# Configure montblanc solver with a memory budget of 1.7GB
-# and set it to double precision floating point accuracy
-
-slvr_cfg = montblanc.rime_solver_cfg(mem_budget=int(1.7*1024*1024*1024),
-                                     dtype='double')
-
-######### Solver Definition ####################################################
-
-def call_solver(rfi_run, time_step):
-    # Create montblanc solver
-    with montblanc.rime_solver(slvr_cfg) as slvr:
-
-        FITSfiles = 'utils/telescope/beam_sim/beams/FAKE_$(corr)_$(reim).fits'
-
-        source = RFISourceProvider(rfi_run, n_time, n_chan, n_ant, freqs,
-                                   bandpass, astro_srcs, rfi_spectra,
-                                   rfi_lm, phase_centre, time_step, A1, A2, UVW)
-        # Create RFI Source and Sink Providers
-        source_provs = [source,
-                        FitsBeamSourceProvider(FITSfiles)
-                       ]
-        sink_provs = [RFISinkProvider(vis, rfi_run, time_step, noise)]
-
-        # Call solver, supplying source and sink providers
-        slvr.solve(#source_providers=[CachedSourceProvider(x) for x in source_provs],
-                   source_providers=source_provs,
-                   sink_providers=sink_provs)
 
 
 ########## Run Simulation ######################################################
 start = tme.time()
-
-########## Set number of channels and antennas #################################
-
-time_steps = args.ntime
-integration_secs = args.intsecs
-n_ant = args.nant
-target_ra = args.ra
-target_dec = args.dec
-obs_date = args.date
-min_flux = args.minflux
-sky_radius = args.radius
-noise = args.noise
-n_sats = args.nsats
-save_dir = args.save_dir
-freqs = np.loadtxt('utils/telescope/bandpass/MeerKAT_L-Band_Frequencies.csv',
-                    delimiter=',')
-
-########## Fixed Parameters ####################################################
-
-n_chan = 4096
-n_bl = n_ant*(n_ant-1)/2
-
-######## Define track length ###################################################
-
-tracking_hours = float(time_steps*integration_secs)/3600
 
 ######## Create UV tracks ######################################################
 
@@ -143,8 +40,10 @@ print("""\nMoving phase centre to closest astronomical target @ \
          RA:{} , DEC:{}\n""".format(*np.round(phase_centre, 2)))
 
 direction = 'J2000,'+str(target_ra)+'deg,'+str(target_dec)+'deg'
+
 uv = UVCreate(antennas='utils/telescope/uv_sim/MeerKAT.enu.txt',
               direction=direction, tel='meerkat', coord_sys='enu', n_ant=n_ant)
+
 ha = -tracking_hours/2, tracking_hours/2
 transit, UVW = uv.itrf2uvw(h0=ha, dtime=integration_secs/3600., date=obs_date)
 

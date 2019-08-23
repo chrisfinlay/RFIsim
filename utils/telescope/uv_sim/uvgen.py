@@ -27,17 +27,17 @@ OBSDATA = "uvw points generated using uvgen.py \n"
 
 # Communication functions
 def info(string):
-    t = "%d/%d/%d %d:%d:%d"%(time.localtime()[:6])
-    print "%s ##INFO: %s"%(t, string)
+    t = "{}/{}/{} {}:{}:{}".format(*time.localtime()[:6])
+    print("{} ##INFO: {}".format(t, string))
 
-def warn(string):
-    t = "%d/%d/%d %d:%d:%d"%(time.localtime()[:6])
-    print "%s ##WARNING: %s"%(t, string)
-
-def abort(string,exception=None):
-    t = "%d/%d/%d %d:%d:%d"%(time.localtime()[:6])
-    exception = exception or SystemExit
-    raise exception("%s ##ABORTING: %s"%(t, string))
+# def warn(string):
+#     t = "%d/%d/%d %d:%d:%d"%(time.localtime()[:6])
+#     print "%s ##WARNING: %s"%(t, string)
+#
+# def abort(string,exception=None):
+#     t = "%d/%d/%d %d:%d:%d"%(time.localtime()[:6])
+#     exception = exception or SystemExit
+#     raise exception("%s ##ABORTING: %s"%(t, string))
 
 
 class UVCreate(object):
@@ -75,7 +75,7 @@ class UVCreate(object):
         self.direction = direction
 
         if tel:
-            lon, lat = [ dm.observatory(tel)[x]['value'] for x in 'm0','m1' ]
+            lon, lat = [ dm.observatory(tel)[x]['value'] for x in ['m0','m1'] ]
 
         if None in [lon,lat]:
             abort('"lon" and "lat" or "tel" have to specified')
@@ -150,7 +150,7 @@ class UVCreate(object):
 
         if isinstance(direction,str):
             direction = direction.split(',')
-        ra, dec = [ dm.direction(*direction)[x]['value'] for x in 'm0','m1' ]
+        ra, dec = [ dm.direction(*direction)[x]['value'] for x in ['m0','m1'] ]
 
         def sunrise_equation(lat,dec):
             arg = -math.tan(lat) * math.tan(dec)
@@ -208,6 +208,7 @@ class UVCreate(object):
             ih0 -= PI
             obs.date -= 0.5
 
+        print(ih0)
         date = obs.date.datetime().ctime()
         return ih0, date, H0, altitude
 
@@ -229,7 +230,7 @@ class UVCreate(object):
         dm  = pyrap.measures.measures()
 
         if tel:
-            lon, lat = [ dm.observatory(tel)[x]['value'] for x in 'm0','m1' ]
+            lon, lat = [ dm.observatory(tel)[x]['value'] for x in ['m0','m1'] ]
 
         antennas = self.antennas if antennas is None else antennas
         lat = lat or self.lat
@@ -254,7 +255,7 @@ class UVCreate(object):
         if isinstance(direction,str):
             direction = direction.split(',')
 
-        ra,dec = [ dm.direction(*direction)[x]['value'] for x in 'm0','m1' ]
+        ra,dec = [ dm.direction(*direction)[x]['value'] for x in ['m0','m1'] ]
 
 
         ntimes = (h0[1]-h0[0])/dtime
@@ -302,7 +303,7 @@ class UVCreate(object):
         meters.
 		"""%(date,numpy.rad2deg(altitude),2*numpy.rad2deg(H0)/15,uvmax/1e3)
 
-	info(OBSDATA)
+        info(OBSDATA)
         return date, numpy.array((u, v, w)).T
 
 def altitude_transit(lat, dec):

@@ -1,6 +1,6 @@
 import numpy as np
 
-def bandpass_time_variation(modes, amplitudes, time):
+def bandpass_time_variation(modes, amplitudes, times):
     """
     Construct periodic signal from Fourier modes and accompanying amplitudes.
 
@@ -10,7 +10,7 @@ def bandpass_time_variation(modes, amplitudes, time):
         The frequencies of the modes to add together.
     amplitudes: array (n_modes, 2)
         The amplitudes of each Fourier mode.
-    time: array
+    times: array (n_time)
         Time steps to evaluate constructed signal at.
 
     Returns:
@@ -20,10 +20,10 @@ def bandpass_time_variation(modes, amplitudes, time):
         sitting on top a constant of 1.
     """
 
-    signal = np.zeros(len(time))
+    signal = np.zeros(len(times))
     for i in range(len(modes)):
-        signal += amplitudes[i,0]*np.cos(2*np.pi*modes[i]*time) + \
-                  amplitudes[i,1]*np.sin(2*np.pi*modes[i]*time)
+        signal += amplitudes[i,0]*np.cos(2*np.pi*modes[i]*times) + \
+                  amplitudes[i,1]*np.sin(2*np.pi*modes[i]*times)
 
     signal /= 10*np.max(np.abs(signal))
     signal += 1
@@ -70,7 +70,7 @@ def get_bandpass_and_gains(target_flux, obs_times):
 
     gain_drift = np.array([bandpass_time_variation(modes=np.random.random(20),
                                  amplitudes=np.random.randn(20, 2),
-                                 time=obs_times) for i in range(n_ant)])
+                                 times=obs_times) for i in range(n_ant)])
 
     bandpass = bandpass*gain_drift.T[:,:,None,None]
 

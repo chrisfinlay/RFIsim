@@ -4,7 +4,7 @@ observation :
   start_time : 11:16:34          # HH:MM:SS local
   # start_time : transit           # Will start observation such that mid observation is at transit of the source
   duration   : 00:15:00          # HH:MM:SS
-  time_steps : 800               # Overrides duration
+  time_steps : 10               # Overrides duration
   int_time   : 1                 # In seconds
 
 
@@ -23,8 +23,8 @@ telescope :
   time_var    : 00:10:00                            # HH:MM:SS Typical time varibaility of bandpass
 
 astronomical :
-  dataframe  : SUMSS_NVSS_Clean.csv
-  radius     : 30.0                                 # Radius in degrees in which to include astronomical sources
+  sky_model  : SUMSS_NVSS_Catalogue.npy             # Radio sky model (n_srcs, (RA,DEC,Flux,SI))
+  radius     : 0.1                                 # Radius in degrees in which to include astronomical sources
 
 
 rfi :

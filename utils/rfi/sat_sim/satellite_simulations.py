@@ -1,7 +1,11 @@
 import spacetrack.operators as op
 from spacetrack import SpaceTrackClient
-from skyfield.api import load, Topos
+from skyfield.api import load as sf_load
+from skyfield.api import Topos
 from skyfield.positionlib import ICRF, Angle
+import sys
+sys.path.insert(0, '../../..')
+from utils.coords.metrics import angular_separation
 import pandas as pd
 import numpy as np
 import datetime
@@ -25,7 +29,10 @@ def get_archival_tles(start_date, end_date):
     """
 
     tle_file = start_date.strftime('%Y-%m-%d')+'.tle'
-    tle_dir = '/home/chris/HIRAX/RFIsim/utils/rfi/sat_sim/TLEs'
+
+    tle_dir = os.path.dirname(os.path.abspath(__file__))
+    tle_dir = os.path.join(tle_dir, 'TLEs')
+#     tle_dir = '/home/chris/HIRAX/RFIsim/utils/rfi/sat_sim/TLEs'
     file_path = os.path.join(tle_dir, tle_file)
 
     if os.path.isfile(file_path) and os.access(file_path, os.R_OK):
@@ -37,8 +44,8 @@ def get_archival_tles(start_date, end_date):
     drange = op.inclusive_range(start_date, end_date)
 
     norad_ids = list(np.load('norad_ids.npy'))
-    
-    tles = [x for x in st.tle(iter_lines=True, epoch=drange, orderby='TLE_LINE1', 
+
+    tles = [x for x in st.tle(iter_lines=True, epoch=drange, orderby='TLE_LINE1',
                               format='tle', norad_cat_id=norad_ids)]
     # x.encode() for python 2
 
@@ -72,13 +79,13 @@ def get_archival_tles(start_date, end_date):
 def get_norad_ids(sat_class='all', save=True, remove_tles=True):
     """
     Get the NORAD IDs for a group of satellites.
-    
+
     Parameters:
     -----------
     sat_class: str
         Class of satellites to get IDs for.
-        Options - 
-        
+        Options -
+
     Returns:
     --------
     ids: list
@@ -102,93 +109,113 @@ def get_norad_ids(sat_class='all', save=True, remove_tles=True):
                    'ses': 'ses.txt',
                    'global_star': 'globalstar.txt',
                   }
-                   
-    
+
+
     norad_url = 'https://www.celestrak.com/NORAD/elements/'
-                   
+
     if sat_class=='all':
         ids = []
         for i in range(len(sat_classes)):
             tle_url = os.path.join(norad_url, sat_classes[list(sat_classes.keys())[i]])
-            ids += list(load.tle(tle_url).keys())[::4]
+            ids += list(sf_load.tle(tle_url).keys())[::4]
             os.remove(sat_classes[list(sat_classes.keys())[i]])
     else:
         tle_url = os.path.join(norad_url, sat_classes[sat_class])
-        ids = list(load.tle(tle_url).keys())[::4]
+        ids = list(sf_load.tle(tle_url).keys())[::4]
         os.remove(sat_classes[sat_class])
-        
+
     ids = np.array([x for x in ids if isinstance(x, int)])
-    
+
     if save:
         np.save('norad_ids.npy', ids)
-    
+
     return ids
 
-def get_dist_and_sep(sat_tle, ant_gps, pointing, time):
+def get_dist_and_seps(sat_tles, ant_locs, times, target):
     """
     Get the distance from an antenna to a satellite and the angular
     separation between the satellite and the antenna pointing.
 
     Parameters:
     -----------
-    sat_tle: Skyfield.EarthSatellite
-        The TLE object of a specific satellite.
-    ant_gps: array-like (3,)
-        The latitude, longitude and elevation of a given antenna.
-    pointing: float
-        The altitude of the pointing direction.
-    time: datetime.datetime
-        Date and time at which to evaluate.
+    sat_tles: Skyfield.EarthSatellite
+        The TLE objects of a set of satellite.
+    ant_locs: array-like (3,)
+        The latitude, longitude and elevation of all antennas.
+    times: datetime.datetime
+        Dates and times at which to evaluate.
+    target: array-like
+        Right ascension and declination of the target.
 
     Returns:
     --------
-    distance: float
+    el_dist_ra_dec_sep: np.array (n_time, n_ant, n_sats, 5)
         The distance, in meters, from the antenna to the satellite.
-    ang_sep: float
-        The angular separation, in degrees, between the pointing direction and the satellite.
     """
 
-    date = time.strftime('%Y-%m-%d %H:%M:%S').split(' ')
-    date = [int(x) for x in date[0].split('-')] + [int(x) for x in date[1].split(':')]
+    ants = [Topos(latitude_degrees=ant_locs[i,0], longitude_degrees=ant_locs[i,1],
+                elevation_m=ant_locs[i,2]) for i in range(len(ant_locs))]
 
-    ts = load.timescale()
-    t = ts.utc(date[0], date[1], date[2], date[3]+2, date[4], date[5])
+    ts = sf_load.timescale()
+    t = ts.utc(times)
 
-    obs = Topos(latitude_degrees=ant_gps[0], longitude_degrees=ant_gps[1],
-                elevation_m=ant_gps[2])
-    zenith = Topos(latitude_degrees=ant_gps[0]+pointing,
-                   longitude_degrees=ant_gps[1], elevation_m=1.e30).at(t)
+    el_dist_ra_dec_sep = np.zeros((len(times), len(ants), len(sat_tles), 5))
 
-    topocentric = (sat_tle-obs).at(t)
+    for i, sat_tle in enumerate(sat_tles):
+        for j, ant in enumerate(ants):
+            topocentric = (sat_tle-ant).at(t)
+            el = topocentric.altaz()[0].degrees
+            dist = topocentric.altaz()[2].m
+            ra = topocentric.radec()[0]._degrees
+            dec = topocentric.radec()[1]._degrees
+            el_dist_ra_dec_sep[:,j,i,:4] = np.array([el, dist, ra, dec]).T
 
-    el, distance = topocentric.altaz()[0::2]
-    ang_sep = np.rad2deg(topocentric.separation_from(zenith).radians)
+    ra, dec = el_dist_ra_dec_sep[:,:,:,2], el_dist_ra_dec_sep[:,:,:,3]
+    el_dist_ra_dec_sep[:,:,:,-1] = angular_separation(ra, dec, target)
 
-    return np.rad2deg(el.radians), distance.m, ang_sep
+    return el_dist_ra_dec_sep
 
-def enu_to_gps_el(gps_centre, enu):
-    """
-    Convert a set of points in ENU co-ordinates to gps coordinates.
-
-    Parameters:
-    ----------
-    gps_centre: array-like (2,)
-        The latitude and longitude, (lat,lon), of the reference antenna sitting at ENU = (0,0,-).
-    enu: array-like (n_ants, 3)
-        The ENU co-ordinates of each antenna. East, North, Up.
-
-    Returns:
-    --------
-    gps_ants: array-like (n_ants, 3)
-        The GPS and elevation coordinates of each antenna.
-    """
-
-    earth_rad = 6.371e6 # metres
-    d_lon = np.rad2deg(enu[:,1]/(earth_rad*np.cos(np.deg2rad(gps_centre[0]))))
-    d_lat = np.rad2deg(enu[:,0]/earth_rad)
-    gps_ants = np.array(gps_centre)[None,:] + np.array([d_lat, d_lon]).T
-
-    return np.concatenate([gps_ants, enu[:,-1:]], axis=1)
+# def get_dist_and_sep(sat_tle, ant_gps, pointing, time):
+#     """
+#     Get the distance from an antenna to a satellite and the angular
+#     separation between the satellite and the antenna pointing.
+#
+#     Parameters:
+#     -----------
+#     sat_tle: Skyfield.EarthSatellite
+#         The TLE object of a specific satellite.
+#     ant_gps: array-like (3,)
+#         The latitude, longitude and elevation of a given antenna.
+#     pointing: float
+#         The altitude of the pointing direction.
+#     time: datetime.datetime
+#         Date and time at which to evaluate.
+#
+#     Returns:
+#     --------
+#     distance: float
+#         The distance, in meters, from the antenna to the satellite.
+#     ang_sep: float
+#         The angular separation, in degrees, between the pointing direction and the satellite.
+#     """
+#
+#     date = time.strftime('%Y-%m-%d %H:%M:%S').split(' ')
+#     date = [int(x) for x in date[0].split('-')] + [int(x) for x in date[1].split(':')]
+#
+#     ts = sf_load.timescale()
+#     t = ts.utc(date[0], date[1], date[2], date[3]+2, date[4], date[5])
+#
+#     obs = Topos(latitude_degrees=ant_gps[0], longitude_degrees=ant_gps[1],
+#                 elevation_m=ant_gps[2])
+#     zenith = Topos(latitude_degrees=ant_gps[0]+pointing,
+#                    longitude_degrees=ant_gps[1], elevation_m=1.e30).at(t)
+#
+#     topocentric = (sat_tle-obs).at(t)
+#
+#     el, distance = topocentric.altaz()[0::2]
+#     ang_sep = np.rad2deg(topocentric.separation_from(zenith).radians)
+#
+#     return np.rad2deg(el.radians), distance.m, ang_sep
 
 def get_time_delays(distances):
     """
@@ -236,172 +263,3 @@ def sinc_beam(ang_sep, params):
     beam = np.sinc(alpha*freq[None,:,None,None]*ang_sep[:,None,:,:,:])
 
     return beam
-
-def auto_beam(ll, mm, ff, a=3e-2, b=2*np.pi/123, phi=320):
-    """
-    Generate the complex beam cube for the auto-polarizations (HH, VV).
-
-    Parameters
-    ----------
-    ll : ndarray
-        Array of shape (channels, resolution, resolution) containing the l
-        coordinate points varying along axis 1.
-    mm : ndarray
-        Array of shape (channels, resolution, resolution) containing the m
-        coordinate points varying along axis 2.
-    ff : ndarray
-        Array of shape (channels, resolution, resolution) containing the
-        frequency coordinate points varying along axis 0.
-    a : float
-        Width of the sinc component of the beam.
-    b : float
-        Oscillatory frequency of the complex exponential component.
-    phi : float
-        Phase offset in the complex exponential component in degrees.
-
-    Returns
-    -------
-    beam : ndarray
-        Array of shape (channels, resolution, resolution) containing the
-        complex values of the beam sensitivity.
-    """
-    phi = np.deg2rad(phi)
-    rr = np.sqrt(ll**2+mm**2)
-    beam = np.exp(-1j*(ff*b - phi))*np.sinc(a*rr*ff)
-
-    return beam
-
-def cross_beam(ll, mm, ff, a=2.5e-2, b=3e-2):
-    """
-    Generate the complex beam cube for the cross-polarizations (HV, VH).
-
-    Parameters
-    ----------
-    ll : ndarray
-        Array of shape (channels, resolution, resolution) containing the l
-        coordinate points varying along axis 1.
-    mm : ndarray
-        Array of shape (channels, resolution, resolution) containing the m
-        coordinate points varying along axis 2.
-    ff : ndarray
-        Array of shape (channels, resolution, resolution) containing the
-        frequency coordinate points varying along axis 0.
-    a : float
-        Width of the sinc component of the beam.
-    b : float
-        Characteristic distance of the exponential dropoff component.
-
-    Returns
-    -------
-    beam : ndarray
-        Array of shape (channels, resolution, resolution) containing the
-        complex values of the beam sensitivity.
-    """
-    rr = np.sqrt(ll**2+mm**2)
-    lam = 2*np.pi/123
-    phi = np.deg2rad(140-180)
-    # sig = [1.2e-1, 1e-3, 1410, 4e-4]
-    # sigmoid = (sig[1]/(1+np.exp(-(sig[0]*(ff-sig[2])))) + sig[3])
-    freq_dep = np.exp(-1j*(lam*ff-phi))#*sigmoid
-    beam = -ll*mm*np.sinc(a*rr*ff)*np.exp(-(rr/b)**2)*freq_dep
-
-    return beam
-
-
-def pol_beam(auto_beam, cross_beam, params, ang_sep):
-    """
-    Calculate the attenuation due to the primary beam for a
-    given angular separation from the pointing direction.
-
-    Parameters:
-    -----------
-    auto_beam: func
-        Function that computes the auto-polarization beam attenuation.
-        auto_beam(ang_sep, params)
-    cross_beam: func
-        Function that computes the auto-polarization beam attenuation.
-        cross_beam(ang_sep, params)
-    params: array-like
-        The parameters to be used in the evaluation of the beams.
-    ang_sep: np.array (n_srcs,)
-        The angular separation between the source and the pointing
-        direction in degrees.
-
-    Returns:
-    --------
-    pol_beam: np.array (2,2,n_srcs,n_freqs)
-        The polarized beam attenuation. [[HH, HV], [VH, VV]].
-    """
-
-    HH = auto_beam(ang_sep, params)
-    HV = np.zeros(HH.shape)
-    VH = np.zeros(HH.shape)
-    VV = auto_beam(ang_sep, params)
-
-#     Currently assuming HH = VV and both HV and VH are 0
-    pol_beam = np.array([[HH, HV],[VH, VV]])
-
-    return pol_beam
-
-def brightness_matrix(I, Q, U, V):
-    """
-    Generate a brightness matrix from Stokes parameters.
-
-    Parameters:
-    -----------
-    I: np.array (n_srcs,n_freqs)
-        Stokes I.
-    Q: np.array (n_srcs,n_freqs)
-        Stokes Q.
-    U: np.array (n_srcs,n_freqs)
-        Stokes U.
-    V: np.array (n_srcs,n_freqs)
-        Stokes V.
-
-    Returns:
-    --------
-    B: np.array (2,2,n_srcs,n_freqs)
-        The brightness matrix.
-    """
-
-    HH = I + Q
-    HV = U + 1.j*V
-    VH = U - 1.j*V
-    VV = I - Q
-
-    B = np.array([[HH, HV], [VH, VV]])
-
-    return B
-
-def RIME(B, E, delays, freqs):
-    """
-    Calculate the visibilities for each baseline and frequency.
-
-    Parameters:
-    -----------
-    B: np.array (2,2,n_srcs,n_freqs)
-        The brightness matrix for all sources at each frequency.
-    E: np.array (2,2,n_srcs,n_freqs)
-        The polarized beam term for all sources at each frequency.
-    delays: np.array (n_bl,n_srcs)
-        The time delays, in seconds, on each baseline for all sources.
-    freqs: np.array (n_freqs)
-        The frequencies, in Hertz, at which we are observing.
-
-    Returns:
-    --------
-    V: np.array (2,2,n_bl,n_freqs)
-        The visibilities according to the RIME formalism.
-    """
-
-#     Phase delays (n_bl, n_srcs, n_freqs)
-    KK = np.exp(-2.j*np.pi*freqs[None,None,:]*delays[:,:,None])
-
-#     Source coherencies (2, 2, n_bl, n_srcs, n_freqs)
-    X = B[:,:,None,:,:] * KK[None,None,:,:,:]
-
-#     Visibilites (2, 2, n_bl, n_freqs)
-    V = np.sum(np.sum(np.sum(E[:,:,None,None,:,:]*X[None,:,:,:,:], axis=1)[:,:,None,:,:] *
-               np.transpose(E.conjugate(), (1,0,2,3))[None,:,:,None,:,:], axis=1), axis=3)
-
-    return V

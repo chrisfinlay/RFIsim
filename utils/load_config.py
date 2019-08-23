@@ -84,8 +84,8 @@ def load_config(config_file='config.yml'):
     input_dir = config['process']['input_dir']
 
     # import and instantiate tzwhere to get timezone from GPS coordinate
-#     from tzwhere import tzwhere
-#     tzwhere = tzwhere.tzwhere()
+    from tzwhere import tzwhere
+    tzwhere = tzwhere.tzwhere()
     config['telescope']['time_zone'] = tzwhere.tzNameAt(*config['telescope']['GPS_coords'][:2])
     config['telescope']['GPS_coords'] = np.array(config['telescope']['GPS_coords'])
     config['telescope']['time_var'] = extract_timedelta(config['telescope']['time_var'])
@@ -117,6 +117,7 @@ def load_config(config_file='config.yml'):
         config['observation']['duration'] = extract_timedelta(config['observation']['duration'])
 
 #     Load astronomical sky model
+    config['astronomical']['sky_model'] = load_file(input_dir, config['astronomical']['sky_model'])
 
 #     Load RFI parameters
     config['rfi']['freq_dist'] = load_file(input_dir, config['rfi']['freq_dist'])
