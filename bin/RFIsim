@@ -96,7 +96,10 @@ E_astro = pol_beam(config['astronomical']['inview'][None,None,:,0],
                    config['astronomical']['inview'][None,None,:,1],
                    freqs, config['observation']['target'],
                    auto_beam, cross_beam)
-E_astro = write_to_zarr(E_astro, 'E_astro', config, time_axis=2, freq_axis=3) *           da.ones((2,2,n_time,n_freq,len(config['telescope']['ENU_coords']),
+E_astro = write_to_zarr(E_astro, 'E_astro', config, time_axis=2, freq_axis=3) * \
+          da.ones((2,2,n_time,n_freq,
+                  len(config['telescope']['ENU_coords']),
+                  len(config['astronomical']['inview'])))
 
 # # Choose satellites
 
