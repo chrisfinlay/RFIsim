@@ -15,7 +15,6 @@ from RFIsim.rfi.rfi_spectra.sim_rfi_spectra import get_rfi_spectra
 from RFIsim.rfi.sat_sim.satellite_simulations import get_dist_and_seps, get_archival_tles
 from RFIsim.telescope.beams import auto_beam, cross_beam
 from skyfield.api import load as sf_load
-import matplotlib.pyplot as plt
 import dask.array as da
 import datetime
 import argparse

@@ -1,7 +1,7 @@
-import sys
-sys.path.insert(0, '../..')
+#import sys
+#sys.path.insert(0, '../..')
 import numpy as np
-from utils.coords.transforms import radec_to_lmn
+from RFIsim.coords.transforms import radec_to_lmn
 
 def sinc_beam(ang_sep, params):
     """
