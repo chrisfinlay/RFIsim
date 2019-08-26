@@ -11,6 +11,8 @@ setup(name='RFIsim',
       scripts=['bin/RFIsim'],
       install_requires=['numpy',
                         'dask',
-                        'zarr'
+                        'zarr',
+                        'skyfield',
+                        'spacetrack'
                        ],
       zip_safe=False)
