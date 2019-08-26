@@ -13,6 +13,8 @@ setup(name='RFIsim',
                         'dask',
                         'zarr',
                         'skyfield',
-                        'spacetrack'
+                        'spacetrack',
+                        'pytz',
+                        'tzwhere'
                        ],
       zip_safe=False)
