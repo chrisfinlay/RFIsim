@@ -15,6 +15,8 @@ setup(name='RFIsim',
                         'skyfield',
                         'spacetrack',
                         'pytz',
-                        'tzwhere'
+                        'tzwhere',
+                        'pandas',
+                        'yaml'
                        ],
       zip_safe=False)
