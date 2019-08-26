@@ -4,7 +4,7 @@ observation :
   start_time : 11:16:34          # HH:MM:SS local
   # start_time : transit           # Will start observation such that mid observation is at transit of the source
   duration   : 00:15:00          # HH:MM:SS
-  time_steps : 10               # Overrides duration
+  time_steps : 100               # Overrides duration
   int_time   : 1                 # In seconds
 
 

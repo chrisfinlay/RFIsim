@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+# coding: utf-8
+# Author Chris Finlay - cfinlay@ska.ac.za
+
+# # Import libraries
+
+from utils.coords.transforms import *
+from utils.coords.metrics import *
+from utils.load_config import load_config
+from utils.telescope.bandpass.bandpass_gains import *
+from utils.helper.write_to_zarr import *
+from utils.rime.rime_comps import *
+from utils.rime.rime_comps_dask import RIME
+from utils.rfi.rfi_spectra.sim_rfi_spectra import get_rfi_spectra
+from utils.rfi.sat_sim.satellite_simulations import get_dist_and_seps, get_archival_tles
+from utils.telescope.beams import auto_beam, cross_beam
+from skyfield.api import load as sf_load
+import matplotlib.pyplot as plt
+import dask.array as da
+import datetime
+import argparse
+import os
+
+######### Arg Parser ###########################################################
+def create_parser():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='config.yml', type=str,
+                        help='Config file')
+    return parser
+
+args = create_parser().parse_args()
+
+#####################################################################3
+s0 = datetime.datetime.now()
+
+# # Load Config
+config = load_config(args.config)
+out_dir = config['process']['output_dir']
+
+# # Calculate obs times
+all_times = [config['observation']['start_datetime'] + i*config['observation']['int_time']
+             for i in range(config['observation']['time_steps'])]
+
+# # Choose target and astro sources
+
+astro = config['astronomical']['sky_model']
+sep = angular_separation(astro[:,0], astro[:,1], config['observation']['target'])
+np.argmin(sep), np.min(sep)
+astro[np.argmin(sep), :2], config['observation']['target']
+config['observation']['target'] = astro[np.argmin(sep), :2]
+sep = angular_separation(astro[:,0], astro[:,1], config['observation']['target'])
+chosen = np.where(sep<config['astronomical']['radius'])[0]
+config['astronomical']['inview'] = astro[chosen]
+
+# # Problem size
+n_time = config['observation']['time_steps']
+n_freq = len(config['telescope']['frequencies'])
+n_ant = len(config['telescope']['ENU_coords'])
+
+# # Calculate UVW coords
+
+ra, dec = config['observation']['target']
+enu = config['telescope']['ENU_coords']
+lat, lon, el = config['telescope']['GPS_coords']
+uvw = ENU_to_UVW(enu, lat, lon, ra, dec, all_times)
+
+# # Get frequencies
+
+freqs = config['telescope']['frequencies']
+
+# # Calculate brightness matrices - astro
+
+freq0 = 863e6
+I, SI = config['astronomical']['inview'][:,2:].T
+I_astro = I[None,None,:]*(freqs[None,:,None]/freq0)**SI[None,None,:]
+Q = np.zeros_like(I_astro)
+U = np.zeros_like(I_astro)
+V = np.zeros_like(I_astro)
+B_astro = brightness_matrix(I_astro, Q, U, V)
+B_astro = write_to_zarr(B_astro, 'B_astro', config, time_axis=2, freq_axis=3) *           da.ones((2,2,n_time,n_freq,len(config['astronomical']['inview'])))
+
+# # Calculate phase delays - astro
+
+lmn = np.array(radec_to_lmn(config['astronomical']['inview'][:,0],
+                   config['astronomical']['inview'][:,1],
+                   config['observation']['target'])).T
+distances = np.dot(uvw, lmn.T)
+K_astro = phase_delays(distances, freqs)
+K_astro = write_to_zarr(K_astro, 'K_astro', config, time_axis=0, freq_axis=1)
+
+
+# # Calculate DDE - astro
+
+E_astro = pol_beam(config['astronomical']['inview'][None,None,:,0],
+                   config['astronomical']['inview'][None,None,:,1],
+                   freqs, config['observation']['target'],
+                   auto_beam, cross_beam)
+E_astro = write_to_zarr(E_astro, 'E_astro', config, time_axis=2, freq_axis=3) *           da.ones((2,2,n_time,n_freq,len(config['telescope']['ENU_coords']),
+
+# # Choose satellites
+
+start_obs = config['observation']['start_datetime']
+obs_time = config['observation']['duration']
+gps_ants = ENU_to_GPS_el(config['telescope']['GPS_coords'], config['telescope']['ENU_coords'])
+one_day = datetime.timedelta(days=1)
+start_obs_ntz = start_obs.replace(tzinfo=None)
+tles = sf_load.tle(get_archival_tles(start_obs_ntz-one_day, start_obs_ntz+one_day))
+
+obs_times = [start_obs+i*0.5*obs_time for i in range(3)]
+el_dist_ra_dec_sep = get_dist_and_seps(list(tles.values()), gps_ants, obs_times, [ra, dec])
+means = np.mean(el_dist_ra_dec_sep, axis=(0,1), keepdims=True)
+selected_sats = np.where((means[:,:,:,0]>0) & (means[:,:,:,-1]<30))[2]
+selected_sat_ids = np.array(list(tles.keys()))[selected_sats].astype(int)
+selected_tles = [tles[i] for i in selected_sat_ids]
+
+int_time = config['observation']['int_time']
+obs_times = [start_obs+i*int_time for i in range(int(obs_time/int_time))]
+el_dist_ra_dec_sep = get_dist_and_seps(selected_tles, gps_ants, obs_times, [ra,dec])
+
+n_rfi = el_dist_ra_dec_sep.shape[-2]
+
+# # Calculate brightness matrices - rfi
+
+rfi_spectra = np.transpose(get_rfi_spectra(n_freq, n_rfi, n_time), (3,1,2,0))
+B_rfi = brightness_matrix(rfi_spectra[0], rfi_spectra[1], rfi_spectra[2], rfi_spectra[3])
+B_rfi = write_to_zarr(B_rfi, 'B_rfi', config, time_axis=2, freq_axis=3)
+
+# # Calculate phase delays - rfi
+
+K_rfi = phase_delays(el_dist_ra_dec_sep[:,:,:,1], freqs)
+K_rfi = write_to_zarr(K_rfi, 'K_rfi', config, time_axis=0, freq_axis=1)
+
+# # Calculate DDE - rfi
+
+E_rfi = pol_beam(el_dist_ra_dec_sep[:,:,:,2],
+                 el_dist_ra_dec_sep[:,:,:,3],
+                 freqs, config['observation']['target'],
+                 auto_beam, cross_beam)
+E_rfi = write_to_zarr(E_rfi, 'E_rfi', config, time_axis=2, freq_axis=3)
+
+# # Calculate gains
+
+G = get_bandpass_and_gains(config['astronomical']['inview'][0,2],
+                           np.array([time.timestamp() for time in obs_times]))
+G = np.transpose(gains(G[0]), (0,1,2,4,3))
+G = write_to_zarr(G, 'G', config, time_axis=2, freq_axis=3)
+
+# # Compute RIME - astro
+
+V_astro = RIME(B_astro, K_astro, E_astro, G)
+s1 = datetime.datetime.now()
+path = os.path.join(outout_dir, 'V_astro')
+da.to_zarr(V_astro, path, overwrite=True, compute=True)
+print('{} s for astronomical visibility calculation.'.format((datetime.datetime.now()-s1).seconds))
+
+# # Compute RIME - rfi
+
+V_rfi = RIME(B_rfi, K_rfi, E_rfi, G)
+s2 = datetime.datetime.now()
+path = os.path.join(outout_dir, 'V_rfi')
+da.to_zarr(V_rfi, path, overwrite=True, compute=True)
+print('{} s taken for RFI visibility calculation.'.format((datetime.datetime.now()-s2).seconds))
+
+print('{} s taken for complete simulation.'.format((datetime.datetime.now()-s0).seconds))

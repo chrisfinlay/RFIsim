@@ -61,7 +61,7 @@ def pol_beam(auto_beam, cross_beam, params, ang_sep):
 def gains(G):
 
     return da.from_array([[G[...,0], G[...,1]],
-                     [G[...,2], G[...,3]]])
+                          [G[...,2], G[...,3]]])
 
 def brightness_matrix(I, Q, U, V):
     """
