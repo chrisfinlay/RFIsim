@@ -4,16 +4,16 @@
 
 # # Import libraries
 
-from utils.coords.transforms import *
-from utils.coords.metrics import *
-from utils.load_config import load_config
-from utils.telescope.bandpass.bandpass_gains import *
-from utils.helper.write_to_zarr import *
-from utils.rime.rime_comps import *
-from utils.rime.rime_comps_dask import RIME
-from utils.rfi.rfi_spectra.sim_rfi_spectra import get_rfi_spectra
-from utils.rfi.sat_sim.satellite_simulations import get_dist_and_seps, get_archival_tles
-from utils.telescope.beams import auto_beam, cross_beam
+from RFIsim.coords.transforms import *
+from RFIsim.coords.metrics import *
+from RFIsim.load_config import load_config
+from RFIsim.telescope.bandpass.bandpass_gains import *
+from RFIsim.helper.write_to_zarr import *
+from RFIsim.rime.rime_comps import *
+from RFIsim.rime.rime_comps_dask import RIME
+from RFIsim.rfi.rfi_spectra.sim_rfi_spectra import get_rfi_spectra
+from RFIsim.rfi.sat_sim.satellite_simulations import get_dist_and_seps, get_archival_tles
+from RFIsim.telescope.beams import auto_beam, cross_beam
 from skyfield.api import load as sf_load
 import matplotlib.pyplot as plt
 import dask.array as da
