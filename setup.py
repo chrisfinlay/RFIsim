@@ -1,13 +1,15 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='RFIsim',
-      version='0.1',
-      description='Realistic Radio Frequency Interference (RFI) simulations for radio interferometers',
+      version='0.2.0',
+      description='Radio Frequency Interference (RFI) simulations for radio interferometers',
       url='http://github.com/chrisfinlay/RFIsim',
       author='Chris Finlay',
       author_email='cfinlay@ska.ac.za',
       license='MIT',
-      packages=['RFIsim'],
+      packages=find_packages(),
+      package_data={'RFIsim': ['rfi/sat_sim/TLEs/norad_ids.npy',
+                               'rfi/sat_sim/TLEs/sat_names.csv']},
       scripts=['bin/RFIsim'],
       install_requires=['numpy',
                         'dask[array]',
