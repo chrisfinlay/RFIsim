@@ -115,6 +115,15 @@ def load_config(config_file='config.yml'):
                                             config['observation']['int_time']
     else:
         config['observation']['duration'] = extract_timedelta(config['observation']['duration'])
+        config['observation']['time_steps'] = int(config['observation']['duration']/config['observation']['int_time'])
+
+    config['observation']['obs_times'] = [config['observation']['start_datetime'] + i*config['observation']['int_time']
+                                          for i in range(config['observation']['time_steps'])]
+
+    if config['observation']['auto_corrs'] == True or str(config['observation']['auto_corrs']).lower() == 'yes':
+        config['observation']['auto_corrs'] = 1
+    else:
+        config['observation']['auto_corrs'] = 0
 
 #     Load astronomical sky model
     config['astronomical']['sky_model'] = load_file(input_dir, config['astronomical']['sky_model'])
@@ -125,20 +134,20 @@ def load_config(config_file='config.yml'):
         try:
             config['rfi'][x]['time_var'] = extract_timedelta(config['rfi'][x]['time_var'])
         except:
-            print('\nNo time variability set for {}.'.format(x))
+            print('No time variability set for {}.'.format(x))
         try:
             config['rfi'][x]['freqs'] = load_file(input_dir, config['rfi'][x]['freqs'])
         except:
-            print('\nNo frequency ranges set for {}.'.format(x))
+            print('No frequency ranges set for {}.'.format(x))
 
     try:
         config['rfi']['cell_towers']['GPS_coords'] = load_file(input_dir, config['rfi']['cell_towers']['GPS_coords'])
     except:
-        print('\nNo GPS coordinates set for cell towers.')
+        print('No GPS coordinates set for cell towers.')
 
     try:
         config['rfi']['planes']['paths'] = load_file(input_dir, config['rfi']['planes']['paths'])
     except:
-        print('\nNo flight paths set for planes.')
+        print('No flight paths set for planes.')
 
     return config

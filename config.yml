@@ -6,7 +6,7 @@ observation :
   duration   : 00:15:00          # HH:MM:SS
   time_steps : 100               # Overrides duration
   int_time   : 1                 # In seconds
-
+  auto_corrs : False             # Calculate auto-correlations
 
 telescope :
   GPS_coords  : [-30.712987, 21.442995, 1049.0]     # Latitude (d), Longitude(d), Elevation (m)
@@ -16,34 +16,35 @@ telescope :
   bandpass_xy : MeerKAT_Bandpass_HV.npy             # Bandpasses per antenna. (n_ants, n_freq)
   bandpass_yx : MeerKAT_Bandpass_VH.npy             # Bandpasses per antenna. (n_ants, n_freq)
   bandpass_yy : MeerKAT_Bandpass_VV.npy             # Bandpasses per antenna. (n_ants, n_freq)
-  beam_xx     : sinc_beam                           # Sinc beam only right now
-  beam_xy     :                                     # Indicates no beam
-  beam_yx     :                                     # Indicates no beam
-  beam_yy     : sinc_beam                           # Sinc beam only right now
+  beam_xx     : sinc_beam                           # Sinc beam only right now   # Not yet implemented
+  beam_xy     :                                     # Indicates no beam          # Not yet implemented
+  beam_yx     :                                     # Indicates no beam          # Not yet implemented
+  beam_yy     : sinc_beam                           # Sinc beam only right now   # Not yet implemented
+  gain        : 1.0
   time_var    : 00:10:00                            # HH:MM:SS Typical time varibaility of bandpass
 
 astronomical :
   sky_model  : SUMSS_NVSS_Catalogue.npy             # Radio sky model (n_srcs, (RA,DEC,Flux,SI))
-  radius     : 0.1                                 # Radius in degrees in which to include astronomical sources
+  radius     : 0.1                                  # Radius in degrees in which to include astronomical sources
 
 
 rfi :
   freq_dist  :   MeerKAT_RFI_Prob_Frequency.npy     # Distribution of RFI over frequency
   satellites :
-    tle_dir    : TLEs/                  # Directory to store TLE files
+    # tle_dir    : TLEs/                  # Directory to store TLE files
     max_sats   : 10                     # Maximum number of satellites to include in simulation
     time_var   : 00:00:01               # Typical time variability in seconds
-    freqs      : GPS_Freqs.npy          # Frequency ranges (n_band, (start,stop))
-  cell_towers :
-    GPS_coords : Cell_Towers_GPS.csv    # GPS locations of cell towers in the area
-    max_towers : 0                      # Maximum number of cell towers to include in simulation
-    time_var   : 00:00:01               # Typical time variability in seconds
-    freqs      : GSM_Freqs.npy          # Frequency ranges (n_band, (start,stop))
-  planes :
-    paths      : Flight_Paths.npy       # Flight paths of airplanes (n_plane, n_time, (x,y,z))
-    max_planes : 0                      # Maximum number of planes to include in simulation
-    time_var   : 00:00:01               # Typical time variability in seconds
-    freqs      : DME_Freqs.npy          # Frequency ranges (n_band, (start,stop))
+    # freqs      : GPS_Freqs.npy          # Frequency ranges (n_band, (start,stop))
+  # cell_towers :
+    # GPS_coords : Cell_Towers_GPS.csv    # GPS locations of cell towers in the area
+    # max_towers : 0                      # Maximum number of cell towers to include in simulation
+    # time_var   : 00:00:01               # Typical time variability in seconds
+    # freqs      : GSM_Freqs.npy          # Frequency ranges (n_band, (start,stop))
+  # planes :
+    # paths      : Flight_Paths.npy       # Flight paths of airplanes (n_plane, n_time, (x,y,z))
+    # max_planes : 0                      # Maximum number of planes to include in simulation
+    # time_var   : 00:00:01               # Typical time variability in seconds
+    # freqs      : DME_Freqs.npy          # Frequency ranges (n_band, (start,stop))
 
 
 process :

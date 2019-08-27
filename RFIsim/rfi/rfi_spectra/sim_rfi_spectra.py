@@ -28,7 +28,7 @@ def pulse(x, A, m, s, n):
 
 def random_spectra(x, s, n):
     """
-    Create a random signal composed of 2-5 random pulses and noise.
+    Create a random signal composed of 1-3 random pulses and noise.
 
     Parameters
     ----------
@@ -51,9 +51,9 @@ def random_spectra(x, s, n):
     s = np.sum([pulse(x, 0.7+0.6*np.random.random(),
                       centre_band*np.random.random()+edge,
                       s*np.random.random(), n)
-                for _ in range(np.random.randint(2, 6))], axis=0)
+                for _ in range(np.random.randint(1, 3))], axis=0)
 
-    s += 0.03*np.random.randn(len(x))
+    # s += 0.03*np.random.randn(len(x))
     s -= np.min(s)
     s *= pulse(x, 1, np.mean(x), (x[-1]-x[0])/3., 10)
 
@@ -115,7 +115,7 @@ def wrap_spectra(spectra, n_rfi):
 
     return rfi_spectrum
 
-def rfi_dist(n_rfi, channels=150, n_chan=4096):
+def rfi_dist(n_rfi, dist_samples, channels=150, n_chan=4096):
     """
     Sample frequency positions for RFI sources from a defined distribution over
     frequency.
@@ -139,7 +139,7 @@ def rfi_dist(n_rfi, channels=150, n_chan=4096):
         ends.
     """
 
-    samples = np.load('utils/rfi/rfi_spectra/MeerKAT_RFI_Prob_Frequency.npy')
+    samples = dist_samples
     samples -= int(channels/2)
     samples = samples[(samples>0) & (samples<n_chan-channels)]
     samples = samples[np.random.permutation(len(samples))]
@@ -173,7 +173,7 @@ def rfi_stokes(n_rfi):
 
     return stokes_rfi[:,None,None,:]
 
-def get_rfi_spectra(n_chan, n_rfi, n_time, type='s'):
+def get_rfi_spectra(n_chan, n_rfi, n_time, dist_samples, config, type='s'):
     """
     Assign spectra to RFI sources.
 
@@ -207,14 +207,15 @@ def get_rfi_spectra(n_chan, n_rfi, n_time, type='s'):
     elif type=='g':
         spectra = np.array([random_spectra(x, s=2., n=2) for _ in range(n_rfi)])
     else:
-        file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_real.npy'
-        spectra = np.load(file_path)
-        perm = np.random.permutation(len(spectra))
-        spectra[perm] = spectra
+        pass
+    #     file_path = 'utils/rfi/rfi_spectra/RFI_Frequency_Spectra_real.npy'
+    #     spectra = np.load(file_path)
+    #     perm = np.random.permutation(len(spectra))
+    #     spectra[perm] = spectra
 
     rfi_spectrum = wrap_spectra(spectra, n_rfi)
 
-    freq_i, freq_f = rfi_dist(n_rfi, channels=rfi_spectrum.shape[1])
+    freq_i, freq_f = rfi_dist(n_rfi, dist_samples, channels=rfi_spectrum.shape[1])
 
     spectrogram = np.zeros((n_rfi, n_time, n_chan, 1), dtype=np.float64)
 
@@ -223,9 +224,11 @@ def get_rfi_spectra(n_chan, n_rfi, n_time, type='s'):
 
     stokes = rfi_stokes(n_rfi)
 
-    time_dep = np.array([rfi_time_variation(modes=np.random.random(20),
+    max_freq = float(1./config['rfi']['satellites']['time_var'].seconds)
+    times = np.array([time.timestamp() for time in config['observation']['obs_times']])
+    time_dep = np.array([rfi_time_variation(modes=0.5*max_freq*np.random.random(20)+0.5*max_freq,
                                  amplitudes=np.random.randn(20, 2),
-                                 time=np.arange(n_time)) for i in range(n_rfi)])
+                                 time=times) for i in range(n_rfi)])
 
     spectrogram = spectrogram*stokes
     spectrogram = spectrogram*time_dep[:,:,None,None]

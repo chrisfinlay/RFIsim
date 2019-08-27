@@ -2,9 +2,7 @@ import spacetrack.operators as op
 from spacetrack import SpaceTrackClient
 from skyfield.api import load as sf_load
 from skyfield.api import Topos
-from skyfield.positionlib import ICRF, Angle
-#import sys
-#sys.path.insert(0, '../../..')
+# from skyfield.positionlib import ICRF, Angle
 from RFIsim.coords.metrics import angular_separation
 import pandas as pd
 import numpy as np

@@ -30,18 +30,15 @@ def bandpass_time_variation(modes, amplitudes, times):
 
     return signal
 
-def get_bandpass_and_gains(target_flux, obs_times):
+def get_bandpass_and_gains(config):
     """
     Loads in the bandpasses from measurements and applys radnom time varying
     gains.
 
     Parameters:
     -----------
-    target_flux: float
-        The flux of the target used to set the gain variable/sensitivity in the
-        correct region.
-    obs_times: array
-        Observation times as unix timestamps
+    config: dict
+        Configuration dictionary created by simulation.
 
     Returns:
     --------
@@ -54,13 +51,15 @@ def get_bandpass_and_gains(target_flux, obs_times):
         Initial gain value applied to the crosspolarizations (HV, VH).
     """
 
-    bandpass_file = 'utils/telescope/bandpass/MeerKAT_Bandpass_HH-HV-VH-VV.npy'
-    # Shape is (1, n_ant, n_chan, 4)
-    bandpass = np.load(bandpass_file).astype(np.complex128)
+    bandpass = np.array([config['telescope']['bandpass_xx'],
+                         config['telescope']['bandpass_xy'],
+                         config['telescope']['bandpass_yx'],
+                         config['telescope']['bandpass_yy']])
+    bandpass = np.transpose(bandpass, (1,2,0))[None,...].astype(np.complex128)
 
     n_ant = bandpass.shape[1]
 
-    gain_var = 14.875/target_flux
+    gain_var = config['telescope']['gain']*14.875/config['observation']['target_flux']
 
     antenna_gains_auto = gain_var*1.*np.random.rand(n_ant) + 0.5
     antenna_gains_cross = gain_var*0.042*np.random.rand(n_ant) + 0.006
@@ -68,9 +67,11 @@ def get_bandpass_and_gains(target_flux, obs_times):
     bandpass[:,:,:,[0,3]] *= antenna_gains_auto[None, :, None, None]
     bandpass[:,:,:,[1,2]] *= antenna_gains_cross[None, :, None, None]
 
-    gain_drift = np.array([bandpass_time_variation(modes=np.random.random(20),
+    max_freq = float(1./config['telescope']['time_var'].seconds)
+    times = np.array([time.timestamp() for time in config['observation']['obs_times']])
+    gain_drift = np.array([bandpass_time_variation(modes=0.5*max_freq*np.random.random(20)+0.5*max_freq,
                                  amplitudes=np.random.randn(20, 2),
-                                 times=obs_times) for i in range(n_ant)])
+                                 times=times) for i in range(n_ant)])
 
     bandpass = bandpass*gain_drift.T[:,:,None,None]
 

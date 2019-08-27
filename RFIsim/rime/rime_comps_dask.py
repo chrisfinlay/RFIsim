@@ -49,8 +49,8 @@ def pol_beam(auto_beam, cross_beam, params, ang_sep):
     """
 
     HH = auto_beam(ang_sep, params)
-    HV = np.zeros(HH.shape)
-    VH = np.zeros(HH.shape)
+    HV = da.zeros(HH.shape)
+    VH = da.zeros(HH.shape)
     VV = auto_beam(ang_sep, params)
 
 #     Currently assuming HH = VV and both HV and VH are 0
