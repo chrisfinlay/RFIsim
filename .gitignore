@@ -1,3 +1,4 @@
+RFIsim.egg-info
 output_data/
 notebooks/
 utils/telescope/beam_sim/beams/
@@ -12,3 +13,7 @@ montblanc.log*
 *.ipynb_checkpoints
 *.h5
 *.tle
+Leap_Second.dat
+deltat.data
+deltat.preds
+

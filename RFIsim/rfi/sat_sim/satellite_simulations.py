@@ -2,7 +2,6 @@ import spacetrack.operators as op
 from spacetrack import SpaceTrackClient
 from skyfield.api import load as sf_load
 from skyfield.api import Topos
-# from skyfield.positionlib import ICRF, Angle
 from RFIsim.coords.metrics import angular_separation
 import pandas as pd
 import numpy as np
@@ -30,7 +29,6 @@ def get_archival_tles(start_date, end_date):
 
     tle_dir = os.path.dirname(os.path.abspath(__file__))
     tle_dir = os.path.join(tle_dir, 'TLEs')
-#     tle_dir = '/home/chris/HIRAX/RFIsim/utils/rfi/sat_sim/TLEs'
     file_path = os.path.join(tle_dir, tle_file)
 
     if os.path.isfile(file_path) and os.access(file_path, os.R_OK):
@@ -41,7 +39,8 @@ def get_archival_tles(start_date, end_date):
 
     drange = op.inclusive_range(start_date, end_date)
 
-    norad_ids = list(np.load('norad_ids.npy'))
+    norad_path = os.path.join(tle_dir, 'norad_ids.npy')
+    norad_ids = list(np.load(norad_path))
 
     tles = [x for x in st.tle(iter_lines=True, epoch=drange, orderby='TLE_LINE1',
                               format='tle', norad_cat_id=norad_ids)]
@@ -172,92 +171,3 @@ def get_dist_and_seps(sat_tles, ant_locs, times, target):
     el_dist_ra_dec_sep[:,:,:,-1] = angular_separation(ra, dec, target)
 
     return el_dist_ra_dec_sep
-
-# def get_dist_and_sep(sat_tle, ant_gps, pointing, time):
-#     """
-#     Get the distance from an antenna to a satellite and the angular
-#     separation between the satellite and the antenna pointing.
-#
-#     Parameters:
-#     -----------
-#     sat_tle: Skyfield.EarthSatellite
-#         The TLE object of a specific satellite.
-#     ant_gps: array-like (3,)
-#         The latitude, longitude and elevation of a given antenna.
-#     pointing: float
-#         The altitude of the pointing direction.
-#     time: datetime.datetime
-#         Date and time at which to evaluate.
-#
-#     Returns:
-#     --------
-#     distance: float
-#         The distance, in meters, from the antenna to the satellite.
-#     ang_sep: float
-#         The angular separation, in degrees, between the pointing direction and the satellite.
-#     """
-#
-#     date = time.strftime('%Y-%m-%d %H:%M:%S').split(' ')
-#     date = [int(x) for x in date[0].split('-')] + [int(x) for x in date[1].split(':')]
-#
-#     ts = sf_load.timescale()
-#     t = ts.utc(date[0], date[1], date[2], date[3]+2, date[4], date[5])
-#
-#     obs = Topos(latitude_degrees=ant_gps[0], longitude_degrees=ant_gps[1],
-#                 elevation_m=ant_gps[2])
-#     zenith = Topos(latitude_degrees=ant_gps[0]+pointing,
-#                    longitude_degrees=ant_gps[1], elevation_m=1.e30).at(t)
-#
-#     topocentric = (sat_tle-obs).at(t)
-#
-#     el, distance = topocentric.altaz()[0::2]
-#     ang_sep = np.rad2deg(topocentric.separation_from(zenith).radians)
-#
-#     return np.rad2deg(el.radians), distance.m, ang_sep
-
-def get_time_delays(distances):
-    """
-    Get the time delay for each baseline formed by each antenna pair.
-
-    Parameters:
-    -----------
-    distances: array-like (n_time,n_src,n_ants)
-        The distance between an RFI sources and each antenna in metres.
-
-    Returns:
-    --------
-    delays: array-like (n_time,n_src,n_bl)
-        The time delays of the RFI signals between each pair of antennas.
-    """
-
-    c = 2.99792458e8
-    a1, a2 = np.triu_indices(distances.shape[-1], 1)
-    delays = (distances[...,a1]-distances[...,a2])/c
-
-    return delays
-
-def sinc_beam(ang_sep, params):
-    """
-    A sinc beam that narrows with increasing frequency.
-    A parameter $\alpha \propto D$ is present to control
-    the width of the beam.
-
-    Paramters:
-    ----------
-    ang_sep: np.array (n_time,n_ant,n_srcs)
-        The radius at which to evaluate the beam function.
-        Angular separation, in degrees, from the pointing direction.
-    params: array-like (2,)
-        Contains alpha, the width parameter, proportional to the
-        dish diameter. And the frequency. (alpha, freq)
-
-    Returns:
-    --------
-    beam: np.array (n_time,n_freqs,n_ant,n_srcs)
-        The attenuation due to the beam at the given angular separation.
-    """
-
-    alpha, freq = params
-    beam = np.sinc(alpha*freq[None,:,None,None]*ang_sep[:,None,:,:,:])
-
-    return beam
