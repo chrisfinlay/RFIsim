@@ -6,9 +6,9 @@
 
 from RFIsim.coords.transforms import *
 from RFIsim.coords.metrics import *
-from RFIsim.load_config import load_config
-from RFIsim.telescope.bandpass.bandpass_gains import *
-from RFIsim.helper.write_to_zarr import *
+from RFIsim.utils.load_config import load_config
+from RFIsim.telescope.bandpass import *
+from RFIsim.utils.write_to_zarr import write_to_zarr
 from RFIsim.rime.rime_comps import *
 from RFIsim.rime.rime_comps_dask import RIME
 from RFIsim.rfi.rfi_spectra.sim_rfi_spectra import get_rfi_spectra
