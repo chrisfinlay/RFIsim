@@ -56,7 +56,7 @@ def ENU_to_GPS_el(gps_centre, enu):
     gps_ants = np.array(gps_centre)[None,:] + \
                np.array([d_lat, d_lon, enu[:,-1]]).T
 
-    return np.concatenate([gps_ants, enu[:,-1:]], axis=1)
+    return gps_ants
 
 
 def ENU_to_ITRF(enu, lat, lon):
